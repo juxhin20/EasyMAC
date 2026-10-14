@@ -54,6 +54,7 @@ final class AppState {
         spaces.start()
         shelf.restoreFloating()
         awake.start()
+        ClipboardHistory.cleanUpStaleData(enabled: settings.clipboardEnabled, retentionDays: settings.clipboardRetentionDays)
         clipboard.setEnabled(settings.clipboardEnabled)
         clipboardPanel.updateStatusItem()
         shelf.updateStatusItem()
@@ -108,7 +109,8 @@ final class AppState {
         case "hasCompletedOnboarding", "showSettingsOnLaunch", "awakeLastDuration":
             break
         case "clipboardEnabled":
-            clipboard.setEnabled(settings.clipboardEnabled)
+            ClipboardHistory.cleanUpStaleData(enabled: settings.clipboardEnabled, retentionDays: settings.clipboardRetentionDays)
+        clipboard.setEnabled(settings.clipboardEnabled)
         clipboardPanel.updateStatusItem()
         shelf.updateStatusItem()
         notch.start()
@@ -116,7 +118,10 @@ final class AppState {
         if UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["previewNotchHUD"] != nil {
             Task { try? await Task.sleep(for: .seconds(1)); notch.preview() }
         }
-            if !settings.clipboardEnabled { clipboard.clear() }
+            if !settings.clipboardEnabled {
+                clipboard.clear()
+                ClipboardHistory.cleanUpStaleData(enabled: false, retentionDays: 0)
+            }
             clipboardPanel.updateStatusItem()
         case "showClipboardIcon":
             clipboardPanel.updateStatusItem()

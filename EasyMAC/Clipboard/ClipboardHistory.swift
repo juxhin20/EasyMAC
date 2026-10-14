@@ -192,6 +192,7 @@ final class ClipboardHistory {
                 if !fm.fileExists(atPath: url.path), let tiff = image.tiffRepresentation,
                    let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
                     try? png.write(to: url, options: .atomic)
+                    try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path) // owner-only
                 }
                 entry.image = name
                 keepImages.insert(name)
@@ -212,6 +213,22 @@ final class ClipboardHistory {
     // MARK: - Handoff across a restart (updates) in "until restart" mode
 
     private static var handoffMarker: URL { directory.appendingPathComponent("handoff") }
+
+    /// Runs at every launch, even with clipboard history off: in memory-only mode nothing may
+    /// survive on disk except a fresh (< 3 min) update handoff, and nothing at all when disabled.
+    static func cleanUpStaleData(enabled: Bool, retentionDays: Int) {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: directory.path) else { return }
+        if !enabled {
+            try? fm.removeItem(at: directory)
+            return
+        }
+        guard retentionDays == 0 else { return }
+        let date = (try? fm.attributesOfItem(atPath: handoffMarker.path))?[.modificationDate] as? Date
+        if date.map({ Date().timeIntervalSince($0) >= 180 }) ?? true {
+            try? fm.removeItem(at: directory)
+        }
+    }
 
     /// Called when EasyMAC quits. In memory-only mode the history is written once so an update /
     /// quick relaunch can pick it up; it is read back within 3 minutes and deleted right away.
