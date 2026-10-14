@@ -17,6 +17,7 @@ final class AppState {
     let updater = Updater()
     let spaces = SpacesService()
     let files = FileShelf()
+    let awake = AwakeController()
 
     lazy var sidebar = SidebarController(state: self)
     lazy var snap = SnapController(state: self)
@@ -48,6 +49,7 @@ final class AppState {
         spaces.screenProvider = { [weak self] in self?.sidebar.screen }
         spaces.start()
         shelf.restoreFloating()
+        awake.start()
         radial.start()
 
         permissions.onChange = { [weak self] accessibility, _ in
@@ -79,6 +81,7 @@ final class AppState {
 
     func willTerminate() {
         workspaces.saveNow()
+        awake.willTerminate()
     }
 
     private func settingsChanged(key: String?) {
@@ -87,8 +90,12 @@ final class AppState {
             applyActivationPolicy()
         case "radialEnabled", "radialTrigger":
             radial.start()
-        case "hasCompletedOnboarding", "showSettingsOnLaunch":
+        case "hasCompletedOnboarding", "showSettingsOnLaunch", "awakeLastDuration":
             break
+        case "showAwakeIcon":
+            awake.updateItemVisibility()
+        case "awakeMode":
+            awake.modeChanged()
         default:
             windows.settingsChanged()
             sidebar.settingsChanged()

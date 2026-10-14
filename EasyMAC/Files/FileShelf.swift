@@ -197,7 +197,13 @@ final class FileShelf {
 
     static func icon(_ file: ShelfFile) -> NSImage {
         if let cached = icons[file.url.path] { return cached }
-        let icon = NSWorkspace.shared.icon(forFile: file.url.path)
+        // Pre-render a small bitmap: drawing the full multi-resolution icon per row makes scrolling stutter.
+        let full = NSWorkspace.shared.icon(forFile: file.url.path)
+        let icon = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            full.draw(in: rect)
+            return true
+        }
+        icon.cacheMode = .always
         if icons.count > 800 { icons.removeAll() }
         icons[file.url.path] = icon
         return icon

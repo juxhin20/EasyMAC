@@ -162,6 +162,9 @@ final class Settings {
     var showFooter: Bool { didSet { store(showFooter, "showFooter") } }
     var showSpaces: Bool { didSet { store(showSpaces, "showSpaces") } }
     var showFiles: Bool { didSet { store(showFiles, "showFiles") } }
+    var showAwakeIcon: Bool { didSet { store(showAwakeIcon, "showAwakeIcon") } }
+    var awakeMode: AwakeMode { didSet { store(awakeMode.rawValue, "awakeMode") } }
+    var awakeLastDuration: Double { didSet { store(awakeLastDuration, "awakeLastDuration") } }
     var showTray: Bool { didSet { store(showTray, "showTray") } }
     var shelfSort: ShelfSort { didSet { store(shelfSort.rawValue, "shelfSort") } }
     var shelfAlwaysOnTop: Bool { didSet { store(shelfAlwaysOnTop, "shelfAlwaysOnTop") } }
@@ -227,6 +230,9 @@ final class Settings {
         showFooter = bool("showFooter", true)
         showSpaces = bool("showSpaces", false)
         showFiles = bool("showFiles", true)
+        showAwakeIcon = bool("showAwakeIcon", true)
+        awakeMode = choice("awakeMode", AwakeMode.display)
+        awakeLastDuration = double("awakeLastDuration", 0)
         showTray = bool("showTray", true)
         shelfSort = choice("shelfSort", ShelfSort.newest)
         shelfAlwaysOnTop = bool("shelfAlwaysOnTop", true)

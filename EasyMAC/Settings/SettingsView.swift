@@ -173,6 +173,28 @@ private struct GeneralSettings: View {
             }
 
             Section {
+                Toggle(isOn: $settings.showAwakeIcon) {
+                    Text("Show Keep Awake in the menu bar")
+                    Text("☕ while your Mac is kept awake, zzz when it may sleep. Click it for durations and mode.")
+                }
+                Picker("Mode", selection: $settings.awakeMode) {
+                    ForEach(AwakeMode.allCases) { mode in
+                        Label(mode.title, systemImage: mode.symbol).tag(mode)
+                    }
+                }
+                Text(settings.awakeMode.detail + (settings.awakeMode == .lidClosed ? " — asks for your password when switched on and off." : "."))
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text(state.awake.isActive ? "Keeping your Mac awake" : "Off — your Mac can sleep")
+                        .foregroundStyle(state.awake.isActive ? Color.primary : Color.secondary)
+                    Spacer()
+                    Button(state.awake.isActive ? "Stop" : "Keep Awake") { state.awake.toggle() }
+                }
+            } header: {
+                Text("Keep Awake")
+            }
+
+            Section {
                 Toggle("Hide other apps when restoring a workspace", isOn: $settings.hideOthersOnRestore)
             } header: {
                 Text("Workspaces")

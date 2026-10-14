@@ -1,9 +1,79 @@
 import AppKit
+import Quartz
 import SwiftUI
 
-/// File panels can become key (for the search field) without activating EasyMAC.
-final class FilePanel: FloatingPanel {
+/// File panels can become key (search field, keyboard, Quick Look) without activating EasyMAC.
+/// The panel is in the responder chain, so it controls the shared Quick Look panel.
+final class FilePanel: FloatingPanel, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
+    var model: ShelfListModel?
+    /// The list whose files Quick Look is currently showing (receives keys while Quick Look is key).
+    nonisolated(unsafe) static weak var previewOwner: FilePanel?
+
     override var canBecomeKey: Bool { true }
+
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        panel.dataSource = self
+        panel.delegate = self
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        panel.dataSource = nil
+        panel.delegate = nil
+    }
+
+    private var previewURLs: [URL] {
+        MainActor.assumeIsolated { model?.selectedURLs ?? [] }
+    }
+
+    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int { previewURLs.count }
+
+    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
+        let urls = previewURLs
+        return urls.indices.contains(index) ? urls[index] as NSURL : nil
+    }
+
+    /// Arrow keys inside Quick Look move the selection in the list, like Finder.
+    func previewPanel(_ panel: QLPreviewPanel!, handle event: NSEvent!) -> Bool {
+        guard let event, event.type == .keyDown else { return false }
+        return MainActor.assumeIsolated {
+            guard let model, model.selection.count <= 1 else { return false }
+            switch event.keyCode {
+            case 125: model.move(1, extend: false)
+            case 126: model.move(-1, extend: false)
+            default: return false
+            }
+            panel.reloadData()
+            return true
+        }
+    }
+
+    /// Space: open/close Quick Look for the selection.
+    func togglePreview() {
+        guard let panel = QLPreviewPanel.shared() else { return }
+        if QLPreviewPanel.sharedPreviewPanelExists() && panel.isVisible {
+            panel.orderOut(nil)
+            makeKey() // keep arrows/Space working in the list after closing the preview
+        } else if !previewURLs.isEmpty {
+            FilePanel.previewOwner = self
+            // Show Quick Look but keep this list key: EasyMAC never activates, so if Quick Look took
+            // key status the next keystroke would go to the app you were working in.
+            makeKey()
+            panel.updateController()
+            panel.orderFront(nil)
+            panel.reloadData()
+            makeKey()
+        }
+    }
+
+    func selectionChanged() {
+        guard QLPreviewPanel.sharedPreviewPanelExists(), let panel = QLPreviewPanel.shared(), panel.isVisible else { return }
+        panel.reloadData()
+    }
+
+    /// Text field has focus → typing goes to search, not to list shortcuts.
+    var isEditingText: Bool { firstResponder is NSTextView }
 }
 
 /// Shows file lists: one pop-out next to the strip, plus any number of floating windows (↗).
@@ -17,6 +87,7 @@ final class FileShelfController {
     private var popoverSource: ShelfSource?
     private var floating: [String: FilePanel] = [:]
     private var clickMonitors: [Any] = []
+    private var keyMonitor: Any?
     private var moveObservers: [String: NSObjectProtocol] = [:]
 
     private static let popoverSize = NSSize(width: 260, height: 360)
@@ -24,6 +95,49 @@ final class FileShelfController {
 
     init(state: AppState) {
         self.state = state
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let handled = MainActor.assumeIsolated { self?.handleKey(event) == true }
+            return handled ? nil : event
+        }
+    }
+
+    /// Finder-style keys for the focused file list. Returns true when handled.
+    private func handleKey(_ event: NSEvent) -> Bool {
+        let fromQuickLook = event.window is QLPreviewPanel
+        guard let panel = event.window as? FilePanel ?? (fromQuickLook ? FilePanel.previewOwner : nil),
+              let model = panel.model else { return false }
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let editing = panel.isEditingText
+        switch event.keyCode {
+        case 49 where !editing: // Space
+            panel.togglePreview()
+            return true
+        case 125, 126: // ↓ ↑
+            if editing { panel.makeFirstResponder(nil) }
+            model.move(event.keyCode == 125 ? 1 : -1, extend: mods.contains(.shift))
+            return true
+        case 36 where !model.selection.isEmpty, 76 where !model.selection.isEmpty: // Return
+            model.selectedFiles.filter(\.exists).forEach(FileShelf.open)
+            return true
+        case 0 where mods.contains(.command) && !editing: // ⌘A
+            model.selectAll()
+            return true
+        case 51 where !editing && model.source == .tray, 117 where !editing && model.source == .tray: // Delete removes from tray
+            model.selectedFiles.forEach { state.files.removeFromTray($0.url.path) }
+            return true
+        case 53: // Esc
+            if QLPreviewPanel.sharedPreviewPanelExists(), let ql = QLPreviewPanel.shared(), ql.isVisible {
+                ql.orderOut(nil)
+                panel.makeKey()
+            } else if panel === popover {
+                closePopover()
+            } else {
+                model.clearSelection()
+            }
+            return true
+        default:
+            return false
+        }
     }
 
     var isPopoverOpen: Bool { popover?.isVisible == true }
@@ -50,7 +164,7 @@ final class FileShelfController {
         let panel = popover ?? makePanel(level: NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1))
         popover = panel
         popoverSource = source
-        panel.contentView = content(for: source, floating: false)
+        panel.contentView = content(for: source, floating: false, panel: panel)
 
         let size = Self.popoverSize
         let visible = screen.visibleFrame
@@ -71,6 +185,7 @@ final class FileShelfController {
 
     func closePopover() {
         removeClickMonitors()
+        if QLPreviewPanel.sharedPreviewPanelExists(), let ql = QLPreviewPanel.shared(), ql.isVisible { ql.orderOut(nil) }
         guard let panel = popover, panel.isVisible else { return }
         popoverSource = nil
         NSAnimationContext.runAnimationGroup({ $0.duration = 0.1; panel.animator().alphaValue = 0 }, completionHandler: {
@@ -83,10 +198,6 @@ final class FileShelfController {
         // Clicking anywhere else (another app, the desktop) closes the pop-out; drags out of it don't.
         if let m = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.closePopover() }
-        }) { clickMonitors.append(m) }
-        if let m = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
-            if event.keyCode == 53 { MainActor.assumeIsolated { self?.closePopover() } }
-            return event
         }) { clickMonitors.append(m) }
     }
 
@@ -113,7 +224,7 @@ final class FileShelfController {
         }
         let panel = makePanel(level: settings.shelfAlwaysOnTop ? .floating : .normal)
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = content(for: source, floating: true)
+        panel.contentView = content(for: source, floating: true, panel: panel)
         let key = "shelfFrame." + source.id
         if let saved = UserDefaults.standard.string(forKey: key).map(NSRectFromString),
            saved.width > 100, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(saved) }) {
@@ -169,16 +280,22 @@ final class FileShelfController {
         return panel
     }
 
-    private func content(for source: ShelfSource, floating isFloating: Bool) -> NSView {
-        let view = FileListView(
-            source: source,
-            shelf: state.files,
-            isFloating: isFloating,
-            onToggleFloat: { [weak self] in self?.toggleFloat(source) },
-            onClose: { [weak self] in
+    private func content(for source: ShelfSource, floating isFloating: Bool, panel: FilePanel) -> NSView {
+        let model = ShelfListModel(source: source, shelf: state.files)
+        panel.model = model
+        model.onSelectionChange = { [weak panel] in panel?.selectionChanged() }
+        let actions = ShelfActions(
+            toggleFloat: { [weak self] in self?.toggleFloat(source) },
+            close: { [weak self] in
                 if isFloating { self?.closeFloating(source) } else { self?.closePopover() }
+            },
+            preview: { [weak panel] in panel?.togglePreview() },
+            focusList: { [weak panel] in
+                panel?.makeKey()
+                panel?.makeFirstResponder(nil)
             }
         )
+        let view = FileListView(model: model, shelf: state.files, isFloating: isFloating, actions: actions)
         let host = TrackingHostingView(rootView: AnyView(view))
         return PanelBackground.make(style: settings.panelStyle, cornerRadius: 14, content: host)
     }
