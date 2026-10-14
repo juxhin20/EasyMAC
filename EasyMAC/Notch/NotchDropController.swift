@@ -66,6 +66,10 @@ struct NotchDropView: View {
 final class DropTargetView: NSView {
     var onTargeted: ((Bool) -> Void)?
     var onDrop: (([URL]) -> Void)?
+    var onClick: (() -> Void)?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) { onClick?() }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -79,6 +83,7 @@ final class DropTargetView: NSView {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        Log.app.notice("Notch drop: drag entered (\(self.urls(sender).count) files)")
         guard !urls(sender).isEmpty else { return [] }
         onTargeted?(true)
         return .copy
@@ -88,8 +93,11 @@ final class DropTargetView: NSView {
 
     override func draggingExited(_ sender: NSDraggingInfo?) { onTargeted?(false) }
 
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { true }
+
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let list = urls(sender)
+        Log.app.notice("Notch drop: performed with \(list.count) files")
         guard !list.isEmpty else { return false }
         onDrop?(list)
         return true
@@ -105,12 +113,13 @@ final class DropTargetView: NSView {
 final class NotchDropController {
     private unowned let state: AppState
     private let model = NotchDropModel()
-    private var dropPanel: NotchPanel?
     private var clickPanel: NotchPanel?
     private var monitors: [Any] = []
     private var dragChangeCount = 0
     private var dragActive = false
     private var hideTask: Task<Void, Never>?
+    private var droppedThisDrag = false
+    private var releaseWatch: Timer?
 
     init(state: AppState) {
         self.state = state
@@ -122,15 +131,16 @@ final class NotchDropController {
         monitors.removeAll()
         clickPanel?.orderOut(nil)
         clickPanel = nil
-        dropPanel?.orderOut(nil)
-        dropPanel = nil
         guard enabled else { return }
 
         if let m = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown, handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.dragChangeCount = NSPasteboard(name: .drag).changeCount }
         }) { monitors.append(m) }
         if let m = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged, handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.mouseDragged() }
+            MainActor.assumeIsolated {
+                self?.mouseDragged()
+                self?.trackCursor()
+            }
         }) { monitors.append(m) }
         if let m = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp, handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.dragEnded() }
@@ -143,15 +153,56 @@ final class NotchDropController {
     private func mouseDragged() {
         guard !dragActive else { return }
         let pasteboard = NSPasteboard(name: .drag)
+        if pasteboard.changeCount != dragChangeCount, pasteboard.types?.contains(.fileURL) == true {
+            Log.app.notice("Notch drop: file drag started")
+        }
         guard pasteboard.changeCount != dragChangeCount,
               pasteboard.types?.contains(.fileURL) == true else { return }
         dragActive = true
+        droppedThisDrag = false
         showDropZone()
+        // Some drag sources swallow the mouse-up; watch the button state while (and only while) dragging.
+        releaseWatch?.invalidate()
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.trackCursor()
+                if NSEvent.pressedMouseButtons & 1 == 0 { self.dragEnded() }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        releaseWatch = timer
+    }
+
+    private var shelfContainsCursor: Bool {
+        guard let panel = clickPanel else { return false }
+        return panel.frame.insetBy(dx: -6, dy: -6).contains(NSEvent.mouseLocation)
+    }
+
+    /// Highlight follows the cursor directly (doesn't rely on drag-destination callbacks).
+    private func trackCursor() {
+        guard dragActive, model.phase == .waiting || model.phase == .targeted else { return }
+        let inside = shelfContainsCursor
+        if inside != (model.phase == .targeted) {
+            model.phase = inside ? .targeted : .waiting
+            if inside { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
+        }
     }
 
     private func dragEnded() {
         guard dragActive else { return }
         dragActive = false
+        releaseWatch?.invalidate()
+        releaseWatch = nil
+        // Released over the shelf: take the files from the drag pasteboard ourselves. Works even when
+        // macOS doesn't route the drop to us (it never did for windows over the menu bar).
+        if shelfContainsCursor, !droppedThisDrag,
+           let urls = NSPasteboard(name: .drag).readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           !urls.isEmpty {
+            Log.app.notice("Notch drop: added \(urls.count) files on release")
+            dropped(urls)
+            return
+        }
         // Give performDragOperation a moment; if nothing was dropped, close.
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
@@ -162,39 +213,25 @@ final class NotchDropController {
     }
 
     // MARK: - Drop zone
+    //
+    // One persistent window over the notch does both jobs. macOS only offers a drop to windows that
+    // existed when the drag began, so the shelf can't be created on demand: this window sits over the
+    // camera housing all the time (tiny, invisible, catches clicks) and grows into the shelf while
+    // files are dragged.
 
     private func showDropZone() {
-        guard let screen = NSScreen.notchScreen, let notch = screen.notchRect else { return }
+        guard let screen = NSScreen.notchScreen, let notch = screen.notchRect, let panel = clickPanel else { return }
         hideTask?.cancel()
-        let panel = dropPanel ?? makeDropPanel(screen: screen, notch: notch)
-        dropPanel = panel
-        panel.orderFrontRegardless()
+        let width = notch.width + 220
+        let height = notch.height + 60
+        panel.setFrame(NSRect(x: notch.midX - width / 2, y: screen.frame.maxY - height, width: width, height: height), display: true)
+        panel.level = .popUpMenu // below the system drag layer, above the menu bar
         model.phase = .waiting
     }
 
-    private func makeDropPanel(screen: NSScreen, notch: NSRect) -> NotchPanel {
-        let panel = NotchPanel(level: .screenSaver, ignoresMouse: false)
-        panel.hasShadow = false
-        let width = notch.width + 220
-        let height = notch.height + 60
-        panel.setFrame(NSRect(x: notch.midX - width / 2, y: screen.frame.maxY - height, width: width, height: height), display: false)
-        let target = DropTargetView(frame: NSRect(origin: .zero, size: panel.frame.size))
-        target.autoresizingMask = [.width, .height]
-        target.onTargeted = { [weak self] on in
-            guard let self, self.model.phase == .waiting || self.model.phase == .targeted else { return }
-            self.model.phase = on ? .targeted : .waiting
-            if on { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
-        }
-        target.onDrop = { [weak self] urls in self?.dropped(urls) }
-        let host = NSHostingView(rootView: NotchDropView(model: model, notchWidth: notch.width, notchHeight: notch.height))
-        host.frame = target.bounds
-        host.autoresizingMask = [.width, .height]
-        target.addSubview(host)
-        panel.contentView = target
-        return panel
-    }
-
     private func dropped(_ urls: [URL]) {
+        guard !droppedThisDrag else { return }
+        droppedThisDrag = true
         state.files.addToTray(urls)
         model.icons = urls.prefix(3).map { NSWorkspace.shared.icon(forFile: $0.path) }
         model.phase = .added(urls.count)
@@ -208,26 +245,47 @@ final class NotchDropController {
 
     private func hideDropZone() {
         model.phase = .hidden
-        let panel = dropPanel
-        Task {
+        Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(320))
-            if self.model.phase == .hidden { panel?.orderOut(nil) }
+            guard let self, self.model.phase == .hidden, !self.dragActive,
+                  let panel = self.clickPanel, let notch = NSScreen.notchScreen?.notchRect else { return }
+            panel.setFrame(notch, display: true)
+            panel.level = .statusBar
         }
     }
 
-    // MARK: - Click the notch → Tray
+    // MARK: - The notch window (click → Tray, drops → Tray)
 
     private func installClickTarget() {
         guard let screen = NSScreen.notchScreen, let notch = screen.notchRect else { return }
         let panel = NotchPanel(level: .statusBar, ignoresMouse: false)
         panel.hasShadow = false
         panel.setFrame(notch, display: false)
-        let view = NotchClickView(frame: NSRect(origin: .zero, size: notch.size))
-        view.onClick = { [weak self] in
-            guard let self, let notch = NSScreen.notchScreen?.notchRect else { return }
+
+        let container = NotchClickView(frame: NSRect(origin: .zero, size: notch.size))
+        container.autoresizingMask = [.width, .height]
+        container.onClick = { [weak self] in
+            guard let self, self.model.phase == .hidden, let notch = NSScreen.notchScreen?.notchRect else { return }
             self.state.shelf.toggle(.tray, below: notch)
         }
-        panel.contentView = view
+        let host = NSHostingView(rootView: NotchDropView(model: model, notchWidth: notch.width, notchHeight: notch.height))
+        host.frame = container.bounds
+        host.autoresizingMask = [.width, .height]
+        host.unregisterDraggedTypes()
+        container.addSubview(host)
+
+        let target = DropTargetView(frame: container.bounds)
+        target.autoresizingMask = [.width, .height]
+        target.onTargeted = { [weak self] on in
+            guard let self, self.model.phase == .waiting || self.model.phase == .targeted else { return }
+            self.model.phase = on ? .targeted : .waiting
+            if on { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
+        }
+        target.onDrop = { [weak self] urls in self?.dropped(urls) }
+        target.onClick = container.onClick
+        container.addSubview(target) // topmost: receives drags and clicks
+
+        panel.contentView = container
         panel.orderFrontRegardless()
         clickPanel = panel
     }

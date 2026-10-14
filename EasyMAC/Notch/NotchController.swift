@@ -174,7 +174,7 @@ final class NotchController {
     // MARK: - Event tap
 
     func updateTap() {
-        if state.settings.notchHUD && AXIsProcessTrusted() {
+        if state.settings.notchHUD && PermissionCache.accessibility {
             installTap()
         } else {
             removeTap()

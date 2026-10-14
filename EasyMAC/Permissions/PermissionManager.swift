@@ -2,10 +2,19 @@ import AppKit
 import ApplicationServices
 import Observation
 
+/// Last known permission state, readable from any thread at zero cost.
+/// Asking macOS directly is slow (`CGPreflightScreenCaptureAccess` ≈ 9 ms, `AXIsProcessTrusted`
+/// ≈ 1.5 ms, both XPC to the privacy daemon) — calling them per window / per tick on the main thread
+/// caused visible stutter in menus. They're only ever queried on a background queue now.
+enum PermissionCache {
+    nonisolated(unsafe) static var accessibility = AXIsProcessTrusted()
+    nonisolated(unsafe) static var screenRecording = CGPreflightScreenCaptureAccess()
+}
+
 @MainActor @Observable
 final class PermissionManager {
-    private(set) var accessibilityGranted = AXIsProcessTrusted()
-    private(set) var screenRecordingGranted = CGPreflightScreenCaptureAccess()
+    private(set) var accessibilityGranted = PermissionCache.accessibility
+    private(set) var screenRecordingGranted = PermissionCache.screenRecording
     /// Set once we asked the system for screen recording; the grant often needs a relaunch to apply.
     private(set) var screenRecordingRequested = false
 
@@ -13,24 +22,34 @@ final class PermissionManager {
 
     @ObservationIgnored var onChange: ((_ accessibility: Bool, _ screenRecording: Bool) -> Void)?
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var checking = false
 
+    /// Queries macOS off the main thread; updates state (and notifies) only when something changed.
     func refresh() {
-        let ax = AXIsProcessTrusted()
-        let sr = CGPreflightScreenCaptureAccess()
-        guard ax != accessibilityGranted || sr != screenRecordingGranted else { return }
-        Log.permissions.info("Permissions changed: accessibility=\(ax) screenRecording=\(sr)")
-        accessibilityGranted = ax
-        screenRecordingGranted = sr
-        onChange?(ax, sr)
+        guard !checking else { return }
+        checking = true
+        Task {
+            let (ax, sr) = await Task.detached(priority: .utility) {
+                (AXIsProcessTrusted(), CGPreflightScreenCaptureAccess())
+            }.value
+            PermissionCache.accessibility = ax
+            PermissionCache.screenRecording = sr
+            checking = false
+            guard ax != accessibilityGranted || sr != screenRecordingGranted else { return }
+            Log.permissions.info("Permissions changed: accessibility=\(ax) screenRecording=\(sr)")
+            accessibilityGranted = ax
+            screenRecordingGranted = sr
+            onChange?(ax, sr)
+        }
     }
 
-    /// Polls cheaply; 1s while onboarding is open, slower in the background to catch revocations.
+    /// 1 s while onboarding is open, every few seconds otherwise (to notice revocations).
     func startMonitoring(interval: TimeInterval) {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
-        timer?.tolerance = interval * 0.2
+        timer?.tolerance = interval * 0.3
     }
 
     func requestAccessibility() {

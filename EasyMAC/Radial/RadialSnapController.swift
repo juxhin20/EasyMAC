@@ -46,7 +46,7 @@ final class RadialSnapController {
 
     func start() {
         stop()
-        guard settings.radialEnabled, AXIsProcessTrusted() else { return }
+        guard settings.radialEnabled, PermissionCache.accessibility else { return }
         if let m = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: { [weak self] event in
             MainActor.assumeIsolated { self?.flagsChanged(event) }
         }) { monitors.append(m) }

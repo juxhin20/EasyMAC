@@ -196,7 +196,7 @@ final class WindowService {
         let disappeared = !lastOnScreen.subtracting(currentIDs).isEmpty // minimized or closed: ask AX which
         lastOnScreen = currentIDs
         let sweepDue = forceSweep || hasUnconfirmed || disappeared || now.timeIntervalSince(lastSweep) > 4.0
-        if sweepDue, AXIsProcessTrusted() {
+        if sweepDue, PermissionCache.accessibility {
             await sweep(extraPIDs: candidates.map(\.pid), excluded: excluded)
         }
 

@@ -30,10 +30,10 @@ final class SpacesService {
     private typealias CopySpacesFn = @convention(c) (Int32) -> Unmanaged<CFArray>?
 
     nonisolated(unsafe) private static let skylight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)
-    private static let mainConnection: ConnectionFn? = symbol("SLSMainConnectionID") ?? symbol("CGSMainConnectionID")
-    private static let copyManagedDisplaySpaces: CopySpacesFn? = symbol("SLSCopyManagedDisplaySpaces") ?? symbol("CGSCopyManagedDisplaySpaces")
+    nonisolated private static let mainConnection: ConnectionFn? = symbol("SLSMainConnectionID") ?? symbol("CGSMainConnectionID")
+    nonisolated private static let copyManagedDisplaySpaces: CopySpacesFn? = symbol("SLSCopyManagedDisplaySpaces") ?? symbol("CGSCopyManagedDisplaySpaces")
 
-    private static func symbol<T>(_ name: String) -> T? {
+    nonisolated private static func symbol<T>(_ name: String) -> T? {
         guard let handle = skylight, let pointer = dlsym(handle, name) else { return nil }
         return unsafeBitCast(pointer, to: T.self)
     }
@@ -69,18 +69,37 @@ final class SpacesService {
         }
     }
 
+    @ObservationIgnored private var refreshing = false
+
+    /// The WindowServer call runs off the main thread; results are applied on main.
     func refresh() {
-        guard let connection = Self.mainConnection?(),
-              let raw = Self.copyManagedDisplaySpaces?(connection)?.takeRetainedValue() as? [[String: Any]] else {
-            if !spaces.isEmpty { spaces = [] }
-            return
-        }
+        guard !refreshing else { return }
+        refreshing = true
         let screenID = screenProvider()?.stableID
+        Task {
+            let parsed = await Task.detached(priority: .utility) { Self.read(screenID: screenID) }.value
+            refreshing = false
+            guard let parsed else {
+                if !spaces.isEmpty { spaces = [] }
+                return
+            }
+            if parsed.spaces != spaces { spaces = parsed.spaces }
+            if parsed.current != currentID { currentID = parsed.current }
+        }
+    }
+
+    nonisolated private static func read(screenID: String?) -> (spaces: [SpaceInfo], current: UInt64?)? {
+        guard let connection = mainConnection?(),
+              let raw = copyManagedDisplaySpaces?(connection)?.takeRetainedValue() as? [[String: Any]] else { return nil }
+        return parse(raw, screenID: screenID)
+    }
+
+    nonisolated private static func parse(_ raw: [[String: Any]], screenID: String?) -> (spaces: [SpaceInfo], current: UInt64?) {
         // One entry per display (or a single "Main" entry when displays share Spaces).
         let display = raw.first { ($0["Display Identifier"] as? String)?.caseInsensitiveCompare(screenID ?? "") == .orderedSame }
             ?? raw.first { ($0["Display Identifier"] as? String) == "Main" }
             ?? raw.first
-        guard let display else { return }
+        guard let display else { return ([], nil) }
 
         let list = (display["Spaces"] as? [[String: Any]]) ?? []
         var result: [SpaceInfo] = []
@@ -90,8 +109,7 @@ final class SpacesService {
             result.append(SpaceInfo(id: id, index: i + 1, isFullscreen: type == 4))
         }
         let current = ((display["Current Space"] as? [String: Any])?["ManagedSpaceID"] as? NSNumber)?.uint64Value
-        if result != spaces { spaces = result }
-        if current != currentID { currentID = current }
+        return (result, current)
     }
 
     /// Single click switches right away; a second click on the same desktop (double-click)

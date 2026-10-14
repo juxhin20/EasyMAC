@@ -37,7 +37,7 @@ final class ThumbnailService {
     @ObservationIgnored private var visible: [WindowInfo] = []
     @ObservationIgnored private var hovered: WindowInfo?
     @ObservationIgnored private(set) var isActive = false
-    @ObservationIgnored var canCapture: () -> Bool = { CGPreflightScreenCaptureAccess() }
+    @ObservationIgnored var canCapture: () -> Bool = { PermissionCache.screenRecording }
 
     private let maxConcurrent = 3
 

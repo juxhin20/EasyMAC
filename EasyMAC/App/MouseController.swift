@@ -44,8 +44,8 @@ final class MouseController {
         let invert = (direction == .standard && natural) || (direction == .natural && !natural)
         Self.invertVertical = invert
         Self.invertHorizontal = invert && state.settings.reverseMouseHorizontal
-        Log.app.notice("Mouse: direction=\(direction.rawValue, privacy: .public) systemNatural=\(natural) invert=\(invert) ax=\(AXIsProcessTrusted())")
-        if invert && AXIsProcessTrusted() {
+        Log.app.notice("Mouse: direction=\(direction.rawValue, privacy: .public) systemNatural=\(natural) invert=\(invert) ax=\(PermissionCache.accessibility)")
+        if invert && PermissionCache.accessibility {
             guard tap == nil else { return }
             // scrollWheel + gesture (29): gesture events carry the trackpad's finger touches.
             let mask = CGEventMask(1 << CGEventType.scrollWheel.rawValue) | CGEventMask(1 << 29)

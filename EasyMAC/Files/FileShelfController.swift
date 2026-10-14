@@ -234,7 +234,8 @@ final class FileShelfController {
             panel.animator().setFrame(frame, display: true)
             panel.animator().alphaValue = 1
         }
-        installOutsideClickMonitor()
+        // Stays open (on top of every app) until × / Esc / clicking its row or the notch again —
+        // clicking in other apps or on another screen no longer closes it.
     }
 
     func closePopover() {
@@ -245,14 +246,6 @@ final class FileShelfController {
         NSAnimationContext.runAnimationGroup({ $0.duration = 0.1; panel.animator().alphaValue = 0 }, completionHandler: {
             MainActor.assumeIsolated { if panel.alphaValue == 0 { panel.orderOut(nil) } }
         })
-    }
-
-    private func installOutsideClickMonitor() {
-        removeClickMonitors()
-        // Clicking anywhere else (another app, the desktop) closes the pop-out; drags out of it don't.
-        if let m = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.closePopover() }
-        }) { clickMonitors.append(m) }
     }
 
     private func removeClickMonitors() {

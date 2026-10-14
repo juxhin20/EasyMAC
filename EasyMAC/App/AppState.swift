@@ -81,7 +81,7 @@ final class AppState {
                 self.onboarding.show()
             }
         }
-        permissions.startMonitoring(interval: 2)
+        permissions.startMonitoring(interval: 3)
 
         settingsObserver = NotificationCenter.default.addObserver(forName: Settings.didChange, object: nil, queue: .main) { [weak self] note in
             let key = note.object as? String
