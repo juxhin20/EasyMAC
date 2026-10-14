@@ -23,6 +23,8 @@ final class SpacesService {
     @ObservationIgnored private var observer: NSObjectProtocol?
     @ObservationIgnored private var switching = false
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var lastClick: (id: UInt64, time: Date)?
+    @ObservationIgnored private var lastSwitch = Date.distantPast
 
     private typealias ConnectionFn = @convention(c) () -> Int32
     private typealias CopySpacesFn = @convention(c) (Int32) -> Unmanaged<CFArray>?
@@ -92,9 +94,35 @@ final class SpacesService {
         if current != currentID { currentID = current }
     }
 
+    /// Single click switches right away; a second click on the same desktop (double-click)
+    /// opens Mission Control there, showing all of that desktop's windows spread out.
+    func clicked(_ space: SpaceInfo) {
+        let now = Date()
+        if let last = lastClick, last.id == space.id, now.timeIntervalSince(last.time) <= NSEvent.doubleClickInterval {
+            lastClick = nil
+            showOverview()
+            return
+        }
+        lastClick = (space.id, now)
+        switchTo(space)
+    }
+
+    /// Opens Mission Control once the desktop switch animation has finished.
+    private func showOverview() {
+        let wait = max(0, 0.45 - Date().timeIntervalSince(lastSwitch))
+        Task {
+            try? await Task.sleep(for: .seconds(wait))
+            let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.addsToRecentItems = false
+            _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+        }
+    }
+
     func switchTo(_ space: SpaceInfo) {
         refresh()
         guard !switching, let current = currentIndex, current != space.index else { return }
+        lastSwitch = Date()
         currentID = space.id // light up the clicked desktop right away; macOS confirms via notification
         if space.index <= 9, Self.desktopShortcutEnabled(space.index) {
             postControl(keyCode: Self.digitKeyCodes[space.index - 1])

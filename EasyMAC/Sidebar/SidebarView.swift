@@ -157,8 +157,8 @@ struct SidebarView: View {
                     .foregroundStyle(current ? Color.white : Color.secondary)
                     .frame(width: SidebarMetrics.chip, height: SidebarMetrics.space)
                     .contentShape(Rectangle())
-                    .onTapGesture { state.spaces.switchTo(space) }
-                    .help(space.isFullscreen ? "Fullscreen app" : "Desktop \(space.index)")
+                    .onTapGesture { state.spaces.clicked(space) }
+                    .help(space.isFullscreen ? "Fullscreen app" : "Desktop \(space.index) — double-click to see its windows")
                     .animation(.easeOut(duration: 0.15), value: current)
                 }
             }
