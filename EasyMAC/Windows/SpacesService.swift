@@ -37,6 +37,7 @@ final class SpacesService {
     }
 
     var currentIndex: Int? { spaces.first { $0.id == currentID }?.index }
+    var isCurrentFullscreen: Bool { spaces.first { $0.id == currentID }?.isFullscreen ?? false }
 
     func start() {
         guard observer == nil else { return }

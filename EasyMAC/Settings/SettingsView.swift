@@ -142,6 +142,11 @@ private struct GeneralSettings: View {
                     Text("Auto-hide")
                     Text("Slides in when the mouse touches the screen edge, slides out when it leaves.")
                 }
+                Toggle(isOn: $settings.autoHideInFullscreen) {
+                    Text("Auto-hide over fullscreen apps")
+                    Text("Even with auto-hide off, the strip tucks away in fullscreen and slides in at the edge.")
+                }
+                .disabled(settings.autoHide)
                 Picker("Show windows from", selection: $settings.windowScope) {
                     ForEach(WindowScope.allCases) { Text($0.title).tag($0) }
                 }

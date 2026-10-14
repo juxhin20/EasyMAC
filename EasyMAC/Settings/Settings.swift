@@ -144,6 +144,7 @@ final class Settings {
     var sidebarDisplay: SidebarDisplay { didSet { store(sidebarDisplay.rawValue, "sidebarDisplay") } }
     var specificDisplayID: String { didSet { store(specificDisplayID, "specificDisplayID") } }
     var autoHide: Bool { didSet { store(autoHide, "autoHide") } }
+    var autoHideInFullscreen: Bool { didSet { store(autoHideInFullscreen, "autoHideInFullscreen") } }
     var windowScope: WindowScope { didSet { store(windowScope.rawValue, "windowScope") } }
     var hideOthersOnRestore: Bool { didSet { store(hideOthersOnRestore, "hideOthersOnRestore") } }
 
@@ -205,6 +206,7 @@ final class Settings {
         sidebarDisplay = choice("sidebarDisplay", SidebarDisplay.main)
         specificDisplayID = d.string(forKey: "specificDisplayID") ?? ""
         autoHide = bool("autoHide", false)
+        autoHideInFullscreen = bool("autoHideInFullscreen", true)
         windowScope = choice("windowScope", WindowScope.allDisplays)
         hideOthersOnRestore = bool("hideOthersOnRestore", false)
 

@@ -19,6 +19,7 @@ final class SidebarController {
     private var hotkeyRevealed = false
     private var mouseEnteredSinceReveal = false
     private var peeking = false
+    private var wasFullscreen = false
     private var menuOpen = false
     private var currentScreen: NSScreen?
     private var mouseMonitors: [Any] = []
@@ -77,7 +78,7 @@ final class SidebarController {
 
     /// Hotkey / menu: with auto-hide on, toggles a temporary reveal; otherwise shows/hides the strip.
     func toggle() {
-        if settings.autoHide && settings.sidebarEnabled {
+        if autoHideActive && settings.sidebarEnabled {
             if isRevealed {
                 autoRevealed = false
                 hotkeyRevealed = false
@@ -109,7 +110,7 @@ final class SidebarController {
             preview.styleChanged()
         }
         currentScreen = resolveScreen()
-        if !settings.autoHide { autoRevealed = false }
+        if !autoHideActive { autoRevealed = false }
         state.spaces.refresh()
         installMouseMonitors()
         state.thumbnails.restartTimer()
@@ -125,8 +126,25 @@ final class SidebarController {
 
     // MARK: - Visibility
 
+    /// Auto-hide is on when chosen in Settings, and also (optionally) whenever the strip's display
+    /// is showing a fullscreen app, so the strip never covers fullscreen content.
+    private var autoHideActive: Bool {
+        settings.autoHide || (settings.autoHideInFullscreen && state.spaces.isCurrentFullscreen)
+    }
+
+    /// Called when the current desktop changes (e.g. entering or leaving a fullscreen app).
+    private func spaceChanged() {
+        installMouseMonitors()
+        if autoHideActive && !settings.autoHide {
+            autoRevealed = false
+            hotkeyRevealed = false
+        }
+        applyVisibility(animated: true)
+        relayout(animated: false)
+    }
+
     private var shouldBeVisible: Bool {
-        peeking || (settings.sidebarEnabled && (!settings.autoHide || autoRevealed))
+        peeking || (settings.sidebarEnabled && (!autoHideActive || autoRevealed))
     }
 
     private func applyVisibility(animated: Bool) {
@@ -253,9 +271,14 @@ final class SidebarController {
             _ = state.windows.windows
             _ = state.workspaces.workspaces
             _ = state.spaces.spaces
+            _ = state.spaces.currentID
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                if self.state.spaces.isCurrentFullscreen != self.wasFullscreen {
+                    self.wasFullscreen = self.state.spaces.isCurrentFullscreen
+                    self.spaceChanged()
+                }
                 self.state.thumbnails.update(visible: self.displayedWindows)
                 self.relayout(animated: true)
                 self.observeContent()
@@ -266,7 +289,7 @@ final class SidebarController {
     // MARK: - Mouse (auto-hide, follow-mouse display)
 
     private func installMouseMonitors() {
-        let needed = settings.autoHide || settings.sidebarDisplay == .mouse
+        let needed = autoHideActive || settings.sidebarDisplay == .mouse
         if needed == !mouseMonitors.isEmpty { return }
         for monitor in mouseMonitors { NSEvent.removeMonitor(monitor) }
         mouseMonitors.removeAll()
@@ -300,7 +323,7 @@ final class SidebarController {
             }
         }
 
-        guard settings.autoHide, settings.sidebarEnabled, !peeking else { return }
+        guard autoHideActive, settings.sidebarEnabled, !peeking else { return }
         if !isRevealed {
             if isAtEdge(mouse) {
                 autoRevealed = true
