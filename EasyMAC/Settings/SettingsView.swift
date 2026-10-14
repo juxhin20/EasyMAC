@@ -4,7 +4,7 @@ import Observation
 import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, appearance, files, snapWheel, layouts, workspaces, hotkeys, excluded, permissions, about
+    case general, appearance, files, snapWheel, layouts, workspaces, mouse, hotkeys, excluded, permissions, about
     var id: String { rawValue }
 
     var title: String {
@@ -15,6 +15,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .snapWheel: "Snap Wheel"
         case .layouts: "Layouts"
         case .workspaces: "Workspaces"
+        case .mouse: "Mouse"
         case .hotkeys: "Hotkeys"
         case .excluded: "Excluded Apps"
         case .permissions: "Permissions"
@@ -30,6 +31,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .snapWheel: "circle.circle.fill"
         case .layouts: "rectangle.split.2x2.fill"
         case .workspaces: "square.stack.3d.up.fill"
+        case .mouse: "computermouse.fill"
         case .hotkeys: "command"
         case .excluded: "eye.slash.fill"
         case .permissions: "lock.shield.fill"
@@ -45,6 +47,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .snapWheel: .blue
         case .layouts: .teal
         case .workspaces: .purple
+        case .mouse: .brown
         case .hotkeys: .orange
         case .excluded: .pink
         case .permissions: .green
@@ -87,6 +90,7 @@ struct SettingsView: View {
                 case .snapWheel: SnapWheelSettings(state: state)
                 case .layouts: LayoutSettings(state: state)
                 case .workspaces: WorkspaceEditorView(state: state, nav: nav)
+                case .mouse: MouseSettings(state: state)
                 case .hotkeys: HotkeySettings()
                 case .excluded: ExcludedAppsSettings(state: state)
                 case .permissions: PermissionSettings(state: state)
@@ -363,6 +367,10 @@ private struct FilesSettings: View {
                     Text("Drop files on it from anywhere to keep them handy. Only the location is saved — nothing is copied.")
                 }
                 Toggle("Show pinned folders", isOn: $settings.showFiles)
+                Toggle(isOn: $settings.showFilesIcon) {
+                    Text("Folder icon in the menu bar")
+                    Text("Opens Tray, Downloads and your other folders right under the icon.")
+                }
                 Picker("Sort files", selection: $settings.shelfSort) {
                     ForEach(ShelfSort.allCases) { Text($0.title).tag($0) }
                 }
@@ -403,7 +411,7 @@ private struct FilesSettings: View {
             Section {
                 Toggle(isOn: $settings.clipboardEnabled) {
                     Text("Clipboard history")
-                    Text("Press \(HotkeyController.shortcutText(.clipboardHistory) ?? "⌥⇧V") for a bar of everything you copied. Kept in memory only, never saved to disk; password managers are skipped.")
+                    Text("Press \(HotkeyController.shortcutText(.clipboardHistory) ?? "⌥⇧V") for a bar of everything you copied. Password managers are skipped.")
                 }
                 if settings.clipboardEnabled {
                     Toggle("Show clipboard icon in the menu bar", isOn: $settings.showClipboardIcon)
@@ -411,6 +419,18 @@ private struct FilesSettings: View {
                         KeyboardShortcuts.Recorder(for: .clipboardHistory)
                     }
                     Toggle("Paste directly when choosing an item", isOn: $settings.clipboardPasteDirectly)
+                    Picker("Keep history", selection: $settings.clipboardRetentionDays) {
+                        Text("Until restart (memory only)").tag(0)
+                        Text("1 day").tag(1)
+                        Text("3 days").tag(3)
+                        Text("5 days").tag(5)
+                        Text("10 days").tag(10)
+                        Text("30 days").tag(30)
+                    }
+                    if settings.clipboardRetentionDays > 0 {
+                        Text("Saved privately in ~/Library/Application Support/EasyMAC/Clipboard and cleaned up automatically.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     LabeledContent("Remember") {
                         Stepper("\(settings.clipboardLimit) items", value: $settings.clipboardLimit, in: 10...200, step: 10)
                     }
@@ -626,6 +646,32 @@ struct LayoutThumbnail: View {
             }
         }
         .frame(width: area.width, height: area.height)
+    }
+}
+
+// MARK: - Mouse
+
+private struct MouseSettings: View {
+    let state: AppState
+    @Bindable private var settings = Settings.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: $settings.reverseMouseScroll) {
+                    Text("Reverse scrolling for mouse")
+                    Text("Flips the scroll wheel of a regular mouse. Your trackpad and Magic Mouse keep macOS's natural scrolling.")
+                }
+                Toggle("Also reverse sideways scrolling", isOn: $settings.reverseMouseHorizontal)
+                    .disabled(!settings.reverseMouseScroll)
+                if !state.permissions.accessibilityGranted {
+                    Label("Needs Accessibility permission.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Scrolling")
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

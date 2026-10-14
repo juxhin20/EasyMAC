@@ -27,6 +27,7 @@ final class AppState {
     lazy var shelf = FileShelfController(state: self)
     lazy var clipboardPanel = ClipboardPanelController(state: self)
     lazy var notch = NotchController(state: self)
+    lazy var mouse = MouseController(state: self)
     lazy var settingsWindow = SettingsWindowController(state: self)
     lazy var onboarding = OnboardingWindowController(state: self)
     private lazy var restorer = WorkspaceRestorer(area: { [unowned self] in self.usableAreaAX($0) })
@@ -55,13 +56,19 @@ final class AppState {
         awake.start()
         clipboard.setEnabled(settings.clipboardEnabled)
         clipboardPanel.updateStatusItem()
+        shelf.updateStatusItem()
         notch.start()
+        mouse.update()
+        if UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["previewNotchHUD"] != nil {
+            Task { try? await Task.sleep(for: .seconds(1)); notch.preview() }
+        }
         radial.start()
 
         permissions.onChange = { [weak self] accessibility, _ in
             guard let self else { return }
             self.radial.start()
             self.notch.updateTap()
+            self.mouse.update()
             self.windows.requestRefresh(forceSweep: true)
             if !accessibility && self.settings.hasCompletedOnboarding {
                 // Permission revoked while running: walk the user back through onboarding.
@@ -102,13 +109,26 @@ final class AppState {
         case "clipboardEnabled":
             clipboard.setEnabled(settings.clipboardEnabled)
         clipboardPanel.updateStatusItem()
+        shelf.updateStatusItem()
         notch.start()
+        mouse.update()
+        if UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["previewNotchHUD"] != nil {
+            Task { try? await Task.sleep(for: .seconds(1)); notch.preview() }
+        }
             if !settings.clipboardEnabled { clipboard.clear() }
             clipboardPanel.updateStatusItem()
         case "showClipboardIcon":
             clipboardPanel.updateStatusItem()
+        case "showFilesIcon", "showTray", "showFiles":
+            shelf.updateStatusItem()
+            windows.settingsChanged()
+            sidebar.settingsChanged()
+        case "clipboardRetentionDays":
+            clipboard.retentionChanged()
         case "clipboardLimit", "clipboardPasteDirectly", "notchAwakeIndicator", "showMenuBarIcon":
             break
+        case "reverseMouseScroll", "reverseMouseHorizontal":
+            mouse.update()
         case "notchHUD":
             notch.updateTap()
         case "showAwakeIcon":

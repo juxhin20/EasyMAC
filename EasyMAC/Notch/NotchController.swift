@@ -13,6 +13,11 @@ extension NSScreen {
     static var notchScreen: NSScreen? { screens.first { $0.notchRect != nil } }
 }
 
+/// Panel allowed to sit in the menu bar / notch strip (AppKit normally pushes windows below it).
+final class NotchPanel: FloatingPanel {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+}
+
 @MainActor @Observable
 final class NotchModel {
     enum Kind: Equatable { case volume, brightness }
@@ -139,8 +144,8 @@ struct AwakePillView: View {
 final class NotchController {
     private unowned let state: AppState
     private let model = NotchModel()
-    private var hudPanel: FloatingPanel?
-    private var pillPanel: FloatingPanel?
+    private var hudPanel: NotchPanel?
+    private var pillPanel: NotchPanel?
     private var hideTask: Task<Void, Never>?
     private var pillTimer: Timer?
     nonisolated(unsafe) private var tap: CFMachPort?
@@ -233,7 +238,13 @@ final class NotchController {
 
     // MARK: - HUD
 
-    private func show(_ kind: NotchModel.Kind, level: Float, muted: Bool) {
+    /// Shows the HUD with the current volume for a few seconds (`--args -previewNotchHUD YES`), used to
+    /// check the look without pressing keys.
+    func preview() {
+        show(.volume, level: SystemControls.volume ?? 0.5, muted: SystemControls.isMuted ?? false, hold: 6)
+    }
+
+    private func show(_ kind: NotchModel.Kind, level: Float, muted: Bool, hold: Double = 1.5) {
         guard let screen = NSScreen.notchScreen ?? NSScreen.withMouse else { return }
         let barHeight = max(screen.frame.maxY - screen.visibleFrame.maxY, 24)
         let notch = screen.notchRect ?? NSRect(x: screen.frame.midX - 40, y: screen.frame.maxY - barHeight, width: 80, height: barHeight)
@@ -246,7 +257,7 @@ final class NotchController {
         model.visible = true
         hideTask?.cancel()
         hideTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(1500))
+            try? await Task.sleep(for: .seconds(hold))
             guard !Task.isCancelled, let self else { return }
             self.model.visible = false
             try? await Task.sleep(for: .milliseconds(350))
@@ -255,8 +266,8 @@ final class NotchController {
         }
     }
 
-    private func makeHUD(screen: NSScreen, notch: NSRect) -> FloatingPanel {
-        let panel = FloatingPanel(level: .screenSaver, ignoresMouse: true)
+    private func makeHUD(screen: NSScreen, notch: NSRect) -> NotchPanel {
+        let panel = NotchPanel(level: .screenSaver, ignoresMouse: true)
         panel.hasShadow = false
         let width = notch.width + NotchHUDView.wing * 2
         panel.setFrame(NSRect(x: notch.midX - width / 2, y: screen.frame.maxY - notch.height, width: width, height: notch.height), display: false)
@@ -291,7 +302,7 @@ final class NotchController {
         let start = Date()
         let total = state.awake.endDate.map { $0.timeIntervalSince(start) }
         let panel = pillPanel ?? {
-            let p = FloatingPanel(level: .screenSaver, ignoresMouse: true)
+            let p = NotchPanel(level: .screenSaver, ignoresMouse: true)
             p.hasShadow = false
             let width = notch.height + 22
             // Tucks 10 pt under the notch so the black shapes read as one piece.

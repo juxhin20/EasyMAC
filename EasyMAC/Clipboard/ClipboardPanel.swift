@@ -275,6 +275,19 @@ final class ClipboardPanelController {
         if let m = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.close() }
         }) { monitors.append(m) }
+        // A normal mouse wheel only scrolls vertically: turn it into sideways scrolling over the cards.
+        if let m = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] event in
+            let isOurs = MainActor.assumeIsolated { event.window === self?.panel }
+            guard isOurs, abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX),
+                  let cg = event.cgEvent?.copy() else { return event }
+            cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: cg.getDoubleValueField(.scrollWheelEventPointDeltaAxis1))
+            cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: cg.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1))
+            cg.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: cg.getIntegerValueField(.scrollWheelEventDeltaAxis1))
+            cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
+            cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0)
+            cg.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
+            return NSEvent(cgEvent: cg) ?? event
+        }) { monitors.append(m) }
     }
 
     private func removeMonitors() {

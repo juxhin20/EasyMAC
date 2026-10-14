@@ -142,6 +142,42 @@ final class FileShelfController {
 
     var isPopoverOpen: Bool { popover?.isVisible == true }
 
+    // MARK: - Menu bar icon
+
+    private var statusItem: NSStatusItem?
+    private lazy var statusMenuDelegate = ShelfStatusMenu(controller: self)
+
+    /// Optional folder icon in the menu bar: lists Tray + pinned folders, opens the list right below.
+    func updateStatusItem() {
+        let wanted = settings.showFilesIcon && (settings.showTray || settings.showFiles)
+        if wanted, statusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            let image = NSImage(systemSymbolName: "folder", accessibilityDescription: "Files & Tray")
+            image?.isTemplate = true
+            item.button?.image = image?.withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
+            item.button?.toolTip = "Tray & folders"
+            let menu = NSMenu()
+            menu.delegate = statusMenuDelegate
+            item.menu = menu
+            statusItem = item
+        } else if !wanted, let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            self.statusItem = nil
+        }
+    }
+
+    fileprivate func openFromStatusItem(_ source: ShelfSource) {
+        guard let frame = statusItem?.button?.window?.frame else { return }
+        // Let the menu close first so the pop-out isn't dismissed by its click.
+        Task {
+            try? await Task.sleep(for: .milliseconds(60))
+            toggle(source, below: frame)
+        }
+    }
+
+    fileprivate var statusSources: [ShelfSource] { state.visibleShelfSources }
+    fileprivate var trayCount: Int { state.files.tray.count }
+
     func restoreFloating() {
         for id in UserDefaults.standard.stringArray(forKey: "floatingShelves") ?? [] {
             if let source = ShelfSource(id: id) { showFloating(source) }
@@ -152,6 +188,23 @@ final class FileShelfController {
 
     /// Toggles the pop-out for `source`, placed beside the strip at the clicked row.
     func toggle(_ source: ShelfSource, anchorY: CGFloat, stripFrame: NSRect, edge: SidebarEdge, screen: NSScreen) {
+        let size = Self.popoverSize
+        let visible = screen.visibleFrame
+        let x = edge == .left ? stripFrame.maxX + 8 : stripFrame.minX - 8 - size.width
+        let y = min(max(anchorY - size.height + 40, visible.minY + 8), visible.maxY - size.height - 8)
+        present(source, frame: NSRect(x: x, y: y, width: size.width, height: size.height).integral, slide: edge == .left ? -6 : 6)
+    }
+
+    /// Opens the pop-out right under a menu bar icon.
+    func toggle(_ source: ShelfSource, below buttonFrame: NSRect) {
+        let size = Self.popoverSize
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(NSPoint(x: buttonFrame.midX, y: buttonFrame.midY)) }) ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        let x = min(max(buttonFrame.midX - size.width / 2, visible.minX + 8), visible.maxX - size.width - 8)
+        present(source, frame: NSRect(x: x, y: visible.maxY - size.height - 6, width: size.width, height: size.height).integral, slide: 0)
+    }
+
+    private func present(_ source: ShelfSource, frame: NSRect, slide: CGFloat) {
         if popoverSource == source, isPopoverOpen {
             closePopover()
             return
@@ -166,12 +219,7 @@ final class FileShelfController {
         popoverSource = source
         panel.contentView = content(for: source, floating: false, panel: panel)
 
-        let size = Self.popoverSize
-        let visible = screen.visibleFrame
-        let x = edge == .left ? stripFrame.maxX + 8 : stripFrame.minX - 8 - size.width
-        let y = min(max(anchorY - size.height + 40, visible.minY + 8), visible.maxY - size.height - 8)
-        let frame = NSRect(x: x, y: y, width: size.width, height: size.height).integral
-        panel.setFrame(frame.offsetBy(dx: edge == .left ? -6 : 6, dy: 0), display: true)
+        panel.setFrame(frame.offsetBy(dx: slide, dy: slide == 0 ? 6 : 0), display: true)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { context in
@@ -298,5 +346,27 @@ final class FileShelfController {
         let view = FileListView(model: model, shelf: state.files, isFloating: isFloating, actions: actions)
         let host = TrackingHostingView(rootView: AnyView(view))
         return PanelBackground.make(style: settings.panelStyle, cornerRadius: 14, content: host)
+    }
+}
+
+/// Builds the folder icon's menu each time it opens (counts stay current).
+@MainActor
+private final class ShelfStatusMenu: NSObject, NSMenuDelegate {
+    private unowned let controller: FileShelfController
+
+    init(controller: FileShelfController) {
+        self.controller = controller
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        for source in controller.statusSources {
+            let title = source == .tray && controller.trayCount > 0 ? "Tray (\(controller.trayCount))" : source.title
+            let item = ClosureMenuItem(title) { [weak controller] in controller?.openFromStatusItem(source) }
+            item.image = NSImage(systemSymbolName: source.symbol, accessibilityDescription: nil)
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        menu.addItem(ClosureMenuItem("Files Settings…") { AppState.shared.openSettings(.files) })
     }
 }

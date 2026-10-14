@@ -172,6 +172,10 @@ final class Settings {
     var notchAwakeIndicator: Bool { didSet { store(notchAwakeIndicator, "notchAwakeIndicator") } }
     var awakeMode: AwakeMode { didSet { store(awakeMode.rawValue, "awakeMode") } }
     var awakeLastDuration: Double { didSet { store(awakeLastDuration, "awakeLastDuration") } }
+    var reverseMouseScroll: Bool { didSet { store(reverseMouseScroll, "reverseMouseScroll") } }
+    var reverseMouseHorizontal: Bool { didSet { store(reverseMouseHorizontal, "reverseMouseHorizontal") } }
+    var showFilesIcon: Bool { didSet { store(showFilesIcon, "showFilesIcon") } }
+    var clipboardRetentionDays: Int { didSet { store(clipboardRetentionDays, "clipboardRetentionDays") } }
     var showTray: Bool { didSet { store(showTray, "showTray") } }
     var shelfSort: ShelfSort { didSet { store(shelfSort.rawValue, "shelfSort") } }
     var shelfAlwaysOnTop: Bool { didSet { store(shelfAlwaysOnTop, "shelfAlwaysOnTop") } }
@@ -248,6 +252,10 @@ final class Settings {
         awakeMode = choice("awakeMode", AwakeMode.display)
         awakeLastDuration = double("awakeLastDuration", 0)
         showTray = bool("showTray", true)
+        showFilesIcon = bool("showFilesIcon", true)
+        reverseMouseScroll = bool("reverseMouseScroll", false)
+        reverseMouseHorizontal = bool("reverseMouseHorizontal", false)
+        clipboardRetentionDays = int("clipboardRetentionDays", 0)
         shelfSort = choice("shelfSort", ShelfSort.newest)
         shelfAlwaysOnTop = bool("shelfAlwaysOnTop", true)
 
