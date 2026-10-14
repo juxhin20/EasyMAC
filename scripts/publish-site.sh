@@ -15,6 +15,8 @@ def key(p): return [int(x) for x in re.search(r"EasyMAC-([\d.]+)\.html", p).grou
 blocks = []
 for path in sorted(glob.glob("releases/EasyMAC-*.html"), key=key, reverse=True):
     v = re.search(r"EasyMAC-([\d.]+)\.html", path).group(1)
+    if v not in dates:  # draft notes: not released yet, never shown on the site
+        continue
     body = open(path).read()
     tag = '<span class="tag">Latest</span>' if v == current else ""
     blocks.append(f'''      <article class="reveal">
