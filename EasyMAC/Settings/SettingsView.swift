@@ -215,6 +215,14 @@ private struct AppearanceSettings: View {
                         Toggle("Show titles under thumbnails", isOn: $settings.showTitles)
                         Toggle("Show “EasyMAC ⚙” footer", isOn: $settings.showFooter)
                         Toggle("Show desktops (Spaces) switcher", isOn: $settings.showSpaces)
+                        if settings.showSpaces && !state.spaces.directSwitchingEnabled {
+                            HStack {
+                                Text("Clicks step through every desktop in between.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                Button("Make Switching Instant") { state.spaces.enableDirectSwitching() }
+                                    .controlSize(.small)
+                            }
+                        }
                     }
                 }
             } header: {

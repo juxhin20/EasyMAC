@@ -75,6 +75,7 @@ final class SpacesService {
     func switchTo(_ space: SpaceInfo) {
         refresh()
         guard !switching, let current = currentIndex, current != space.index else { return }
+        currentID = space.id // light up the clicked desktop right away; macOS confirms via notification
         if space.index <= 9, Self.desktopShortcutEnabled(space.index) {
             postControl(keyCode: Self.digitKeyCodes[space.index - 1])
             return
@@ -86,13 +87,38 @@ final class SpacesService {
         Task {
             for _ in 0..<abs(delta) {
                 postControl(keyCode: key)
-                try? await Task.sleep(for: .milliseconds(90))
+                try? await Task.sleep(for: .milliseconds(40))
             }
             switching = false
         }
     }
 
     private static let digitKeyCodes: [CGKeyCode] = [18, 19, 20, 21, 23, 22, 26, 28, 25]
+
+    /// True when ⌃1…⌃N jump straight to a desktop (one slide instead of one per desktop in between).
+    var directSwitchingEnabled: Bool {
+        let n = min(max(spaces.count, 2), 9)
+        return (1...n).allSatisfy { Self.desktopShortcutEnabled($0) }
+    }
+
+    /// Turns on Mission Control's "Switch to Desktop 1–9" (⌃1…⌃9) and applies it without logging out.
+    func enableDirectSwitching() {
+        let ascii = [49, 50, 51, 52, 53, 54, 55, 56, 57]
+        for n in 1...9 {
+            let value: [String: Any] = [
+                "enabled": true,
+                "value": ["parameters": [ascii[n - 1], Int(Self.digitKeyCodes[n - 1]), 262144], "type": "standard"],
+            ]
+            var all = CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, "com.apple.symbolichotkeys" as CFString) as? [String: Any] ?? [:]
+            all[String(117 + n)] = value
+            CFPreferencesSetAppValue("AppleSymbolicHotKeys" as CFString, all as CFDictionary, "com.apple.symbolichotkeys" as CFString)
+        }
+        CFPreferencesAppSynchronize("com.apple.symbolichotkeys" as CFString)
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings")
+        task.arguments = ["-u"]
+        try? task.run()
+    }
 
     /// "Switch to Desktop N" = symbolic hot key 118…126; off by default in macOS.
     private static func desktopShortcutEnabled(_ n: Int) -> Bool {
