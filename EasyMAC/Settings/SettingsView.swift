@@ -302,20 +302,33 @@ private struct AppearanceSettings: View {
                             ForEach(AccentChoice.allCases) { Text($0.title).tag($0) }
                         }
                         Toggle("Show titles under thumbnails", isOn: $settings.showTitles)
-                        Toggle("Show “EasyMAC ⚙” footer", isOn: $settings.showFooter)
-                        Toggle("Show desktops (Spaces) switcher", isOn: $settings.showSpaces)
-                        if settings.showSpaces && !state.spaces.directSwitchingEnabled {
-                            HStack {
-                                Text("Clicks step through every desktop in between.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                Button("Make Switching Instant") { state.spaces.enableDirectSwitching() }
-                                    .controlSize(.small)
-                            }
-                        }
                     }
                 }
             } header: {
                 Text("Look")
+            }
+
+            Section {
+                Toggle("Workspaces (colored circles + “+”)", isOn: $settings.stripShowWorkspaces)
+                Toggle("Tray", isOn: $settings.stripShowTray)
+                    .disabled(!settings.showTray)
+                Toggle("Folders (Downloads, Desktop…)", isOn: $settings.stripShowFolders)
+                    .disabled(!settings.showFiles)
+                Toggle("Desktops (1 2 3…)", isOn: $settings.showSpaces)
+                if settings.showSpaces && !state.spaces.directSwitchingEnabled {
+                    HStack {
+                        Text("Clicks step through every desktop in between.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Make Switching Instant") { state.spaces.enableDirectSwitching() }
+                            .controlSize(.small)
+                    }
+                }
+                Toggle("“EasyMAC ⚙” footer", isOn: $settings.showFooter)
+                Text("Hiding Tray or Folders here only removes them from the strip — they stay in the menu bar and the notch.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Show in the strip")
             }
 
             Section {

@@ -210,6 +210,11 @@ final class AppState {
         return list
     }
 
+    /// Rows shown in the strip: the enabled sources, minus what's hidden from the strip only.
+    var stripShelfSources: [ShelfSource] {
+        visibleShelfSources.filter { $0 == .tray ? settings.stripShowTray : settings.stripShowFolders }
+    }
+
     func toggleShelf(_ source: ShelfSource) {
         guard let screen = sidebar.screen ?? NSScreen.main else { return }
         shelf.toggle(source, anchorY: NSEvent.mouseLocation.y, stripFrame: sidebar.frame, edge: settings.sidebarEdge, screen: screen)

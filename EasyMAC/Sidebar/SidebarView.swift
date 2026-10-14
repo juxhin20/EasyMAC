@@ -9,7 +9,8 @@ struct SidebarView: View {
     private var metrics: SidebarMetrics {
         SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter,
                        spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0,
-                       fileRowCount: state.visibleShelfSources.count)
+                       fileRowCount: state.stripShelfSources.count,
+                       showWorkspaces: settings.stripShowWorkspaces)
     }
     private var accent: Color { Color(nsColor: settings.sidebarAccent.nsColor) }
 
@@ -17,11 +18,13 @@ struct SidebarView: View {
         let windows = SidebarModel.displayed(state.windows.windows, max: settings.maxVisible)
         VStack(spacing: 0) {
             Color.clear.frame(height: SidebarMetrics.headerTop)
-            chips
-            Capsule()
-                .fill(Color.primary.opacity(0.12))
-                .frame(width: metrics.thumbWidth * 0.6, height: 1)
-                .frame(height: SidebarMetrics.dividerBlock)
+            if settings.stripShowWorkspaces {
+                chips
+                Capsule()
+                    .fill(Color.primary.opacity(0.12))
+                    .frame(width: metrics.thumbWidth * 0.6, height: 1)
+                    .frame(height: SidebarMetrics.dividerBlock)
+            }
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: SidebarMetrics.spacing) {
                     if windows.isEmpty {
@@ -141,7 +144,7 @@ struct SidebarView: View {
                 .fill(Color.primary.opacity(0.12))
                 .frame(width: metrics.thumbWidth * 0.6, height: 1)
                 .frame(height: SidebarMetrics.dividerBlock)
-            ForEach(state.visibleShelfSources) { source in
+            ForEach(state.stripShelfSources) { source in
                 ShelfRow(source: source, state: state, accent: accent, width: metrics.thumbWidth)
             }
         }

@@ -211,7 +211,8 @@ final class SidebarController {
     private var metrics: SidebarMetrics {
         SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter,
                        spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0,
-                       fileRowCount: state.visibleShelfSources.count)
+                       fileRowCount: state.stripShelfSources.count,
+                       showWorkspaces: settings.stripShowWorkspaces)
     }
 
     private var displayedWindows: [WindowInfo] {

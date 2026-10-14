@@ -16,6 +16,7 @@ struct SidebarMetrics: Equatable {
     var showFooter = true
     var spaceCount = 0
     var fileRowCount = 0
+    var showWorkspaces = true
 
     static let fileRow: CGFloat = 18
 
@@ -60,7 +61,7 @@ struct SidebarMetrics: Equatable {
     }
 
     func contentHeight(windowCount: Int, chipCount: Int) -> CGFloat {
-        filesHeight + spacesHeight + Self.headerTop + chipsHeight(chipCount: chipCount) + Self.dividerBlock + cellsHeight(windowCount: windowCount) + (showFooter ? Self.footer : Self.padding)
+        filesHeight + spacesHeight + Self.headerTop + (showWorkspaces ? chipsHeight(chipCount: chipCount) + Self.dividerBlock : 0) + cellsHeight(windowCount: windowCount) + (showFooter ? Self.footer : Self.padding)
     }
 }
 
