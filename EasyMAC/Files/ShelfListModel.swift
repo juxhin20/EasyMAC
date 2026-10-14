@@ -9,6 +9,8 @@ final class ShelfListModel {
     private(set) var files: [ShelfFile] = []
     private(set) var totalCount = 0
     private(set) var selection: Set<String> = []
+    /// Folders opened inside this list (double-click), deepest last.
+    private(set) var trail: [URL] = []
     var hoveredID: String?
     var query = "" { didSet { applyFilter() } }
 
@@ -16,6 +18,7 @@ final class ShelfListModel {
     @ObservationIgnored private var all: [ShelfFile] = []
     @ObservationIgnored private var anchor: Int?
     @ObservationIgnored var onSelectionChange: (() -> Void)?
+    @ObservationIgnored private var watcher: DispatchSourceFileSystemObject?
 
     init(source: ShelfSource, shelf: FileShelf) {
         self.source = source
@@ -37,8 +40,53 @@ final class ShelfListModel {
         }
     }
 
+    var title: String { trail.last.map { FileManager.default.displayName(atPath: $0.path) } ?? source.title }
+    var canGoBack: Bool { !trail.isEmpty }
+
+    /// Double-click / Return: folders open inside the list, everything else opens normally.
+    func open(_ file: ShelfFile) {
+        guard file.exists else { return }
+        if file.isDirectory {
+            navigate(to: trail + [file.url])
+        } else {
+            FileShelf.open(file)
+        }
+    }
+
+    func goBack() {
+        guard !trail.isEmpty else { return }
+        navigate(to: Array(trail.dropLast()))
+    }
+
+    private func navigate(to newTrail: [URL]) {
+        trail = newTrail
+        query = ""
+        selection = []
+        anchor = nil
+        watchCurrentFolder()
+        reload()
+        onSelectionChange?()
+    }
+
+    private func watchCurrentFolder() {
+        watcher?.cancel()
+        watcher = nil
+        guard let folder = trail.last else { return }
+        let fd = Darwin.open(folder.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main)
+        source.setEventHandler { [weak self] in MainActor.assumeIsolated { self?.reload() } }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        watcher = source
+    }
+
     func reload() {
-        all = shelf.files(for: source, sort: Settings.shared.shelfSort)
+        if let folder = trail.last {
+            all = FileShelf.listFolder(folder.path, sort: Settings.shared.shelfSort)
+        } else {
+            all = shelf.files(for: source, sort: Settings.shared.shelfSort)
+        }
         totalCount = all.count
         applyFilter()
     }

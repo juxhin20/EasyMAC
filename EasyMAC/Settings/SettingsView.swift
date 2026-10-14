@@ -185,6 +185,10 @@ private struct GeneralSettings: View {
                     Text("Volume & brightness in the notch")
                     Text("Volume, mute and brightness keys show a sleek bar under the notch instead of the system popup.")
                 }
+                Toggle(isOn: $settings.notchTray) {
+                    Text("Drop files on the notch → Tray")
+                    Text("While you drag files, the notch opens a drop shelf. Click the notch to open the Tray.")
+                }
                 Toggle(isOn: $settings.notchAwakeIndicator) {
                     Text("Keep Awake indicator next to the notch")
                     Text("A small cup with a ring that shows the time left.")

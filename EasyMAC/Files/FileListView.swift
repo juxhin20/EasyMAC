@@ -58,10 +58,20 @@ struct FileListView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: source.symbol)
+            if model.canGoBack {
+                Button(action: model.goBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Back (⌘↑)")
+            }
+            Image(systemName: model.canGoBack ? "folder.fill" : source.symbol)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(source == .tray ? accent : Color(red: 0.27, green: 0.6, blue: 0.98))
-            Text(source.title)
+                .foregroundStyle(source == .tray && !model.canGoBack ? accent : Color(red: 0.27, green: 0.6, blue: 0.98))
+            Text(model.title)
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
             Text(model.totalCount >= FileShelf.maxItems ? "\(FileShelf.maxItems)+" : "\(model.totalCount)")
@@ -226,7 +236,7 @@ private struct FileRowInteraction: NSViewRepresentable {
                 guard let file, let model else { return }
                 actions?.focusList()
                 if event.clickCount >= 2 {
-                    if file.exists { FileShelf.open(file) }
+                    model.open(file)
                     return
                 }
                 // Plain click on an already-selected row keeps a multi-selection for dragging.

@@ -112,12 +112,18 @@ final class FileShelfController {
         case 49 where !editing: // Space
             panel.togglePreview()
             return true
+        case 126 where mods.contains(.command): // ⌘↑ back to the parent folder
+            model.goBack()
+            return true
+        case 125 where mods.contains(.command): // ⌘↓ open the selected folder / file
+            model.selectedFiles.forEach(model.open)
+            return true
         case 125, 126: // ↓ ↑
             if editing { panel.makeFirstResponder(nil) }
             model.move(event.keyCode == 125 ? 1 : -1, extend: mods.contains(.shift))
             return true
         case 36 where !model.selection.isEmpty, 76 where !model.selection.isEmpty: // Return
-            model.selectedFiles.filter(\.exists).forEach(FileShelf.open)
+            model.selectedFiles.forEach(model.open)
             return true
         case 0 where mods.contains(.command) && !editing: // ⌘A
             model.selectAll()

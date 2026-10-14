@@ -125,21 +125,26 @@ final class FileShelf {
         case .tray:
             return tray.map { Self.file(at: URL(fileURLWithPath: $0)) }
         case .folder(let path):
-            let keys: [URLResourceKey] = [.contentModificationDateKey, .addedToDirectoryDateKey, .isDirectoryKey, .fileSizeKey]
-            let urls = (try? FileManager.default.contentsOfDirectory(
-                at: URL(fileURLWithPath: path), includingPropertiesForKeys: keys,
-                options: [.skipsHiddenFiles, .skipsPackageDescendants])) ?? []
-            var files = urls.map { Self.file(at: $0) }
-            switch sort {
-            case .newest: files.sort { $0.date > $1.date }
-            case .name: files.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-            }
-            return Array(files.prefix(Self.maxItems))
+            return Self.listFolder(path, sort: sort)
         }
     }
 
+    /// Contents of any folder (used for pinned folders and for folders opened inside a list).
+    static func listFolder(_ path: String, sort: ShelfSort) -> [ShelfFile] {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .addedToDirectoryDateKey, .isDirectoryKey, .isPackageKey, .fileSizeKey]
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: URL(fileURLWithPath: path), includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants])) ?? []
+        var files = urls.map { file(at: $0) }
+        switch sort {
+        case .newest: files.sort { $0.date > $1.date }
+        case .name: files.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+        return Array(files.prefix(maxItems))
+    }
+
     private static func file(at url: URL) -> ShelfFile {
-        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .addedToDirectoryDateKey, .isDirectoryKey, .fileSizeKey])
+        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .addedToDirectoryDateKey, .isDirectoryKey, .isPackageKey, .fileSizeKey])
         let exists = FileManager.default.fileExists(atPath: url.path)
         return ShelfFile(
             url: url,
@@ -147,7 +152,7 @@ final class FileShelf {
             // "Date added" matches what you see in Finder for Downloads; fall back to modified.
             date: values?.addedToDirectoryDate ?? values?.contentModificationDate ?? .distantPast,
             size: values?.fileSize.map(Int64.init),
-            isDirectory: values?.isDirectory ?? false,
+            isDirectory: (values?.isDirectory ?? false) && !(values?.isPackage ?? false),
             exists: exists
         )
     }

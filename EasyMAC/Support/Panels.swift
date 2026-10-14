@@ -7,11 +7,11 @@ class FloatingPanel: NSPanel {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
                    styleMask: [.nonactivatingPanel, .borderless],
                    backing: .buffered, defer: false)
+        isFloatingPanel = true // must come before `level`: setting it resets the level to .floating
         self.level = level
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         isMovableByWindowBackground = false
         hidesOnDeactivate = false
-        isFloatingPanel = true
         becomesKeyOnlyIfNeeded = true
         backgroundColor = .clear
         isOpaque = false

@@ -28,6 +28,7 @@ final class AppState {
     lazy var clipboardPanel = ClipboardPanelController(state: self)
     lazy var notch = NotchController(state: self)
     lazy var mouse = MouseController(state: self)
+    lazy var notchDrop = NotchDropController(state: self)
     lazy var settingsWindow = SettingsWindowController(state: self)
     lazy var onboarding = OnboardingWindowController(state: self)
     private lazy var restorer = WorkspaceRestorer(area: { [unowned self] in self.usableAreaAX($0) })
@@ -60,6 +61,10 @@ final class AppState {
         shelf.updateStatusItem()
         notch.start()
         mouse.update()
+        notchDrop.update()
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.notchDrop.update() }
+        }
         if UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["previewNotchHUD"] != nil {
             Task { try? await Task.sleep(for: .seconds(1)); notch.preview() }
         }
@@ -109,15 +114,7 @@ final class AppState {
         case "hasCompletedOnboarding", "showSettingsOnLaunch", "awakeLastDuration":
             break
         case "clipboardEnabled":
-            ClipboardHistory.cleanUpStaleData(enabled: settings.clipboardEnabled, retentionDays: settings.clipboardRetentionDays)
-        clipboard.setEnabled(settings.clipboardEnabled)
-        clipboardPanel.updateStatusItem()
-        shelf.updateStatusItem()
-        notch.start()
-        mouse.update()
-        if UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["previewNotchHUD"] != nil {
-            Task { try? await Task.sleep(for: .seconds(1)); notch.preview() }
-        }
+            clipboard.setEnabled(settings.clipboardEnabled)
             if !settings.clipboardEnabled {
                 clipboard.clear()
                 ClipboardHistory.cleanUpStaleData(enabled: false, retentionDays: 0)
@@ -135,6 +132,8 @@ final class AppState {
             break
         case "mouseScrollDirection", "reverseMouseHorizontal":
             mouse.update()
+        case "notchTray":
+            notchDrop.update()
         case "notchHUD":
             notch.updateTap()
         case "showAwakeIcon":
