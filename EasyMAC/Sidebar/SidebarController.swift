@@ -48,6 +48,7 @@ final class SidebarController {
                 guard let self else { return }
                 self.currentScreen = self.resolveScreen()
                 self.relayout(animated: false)
+                self.updateHandle()
             }
         })
         observers.append(center.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
@@ -79,6 +80,10 @@ final class SidebarController {
 
     /// Hotkey / menu: with auto-hide on, toggles a temporary reveal; otherwise shows/hides the strip.
     func toggle() {
+        if settings.sidebarCollapsed {
+            setCollapsed(false)
+            return
+        }
         if autoHideActive && settings.sidebarEnabled {
             if isRevealed {
                 autoRevealed = false
@@ -145,11 +150,55 @@ final class SidebarController {
     }
 
     private var shouldBeVisible: Bool {
-        peeking || (settings.sidebarEnabled && (!autoHideActive || autoRevealed))
+        peeking || (settings.sidebarEnabled && !settings.sidebarCollapsed && (!autoHideActive || autoRevealed))
+    }
+
+    // MARK: - Collapse to a small arrow
+
+    private var handle: FloatingPanel?
+
+    /// Arrow button: tuck the strip away, leaving a small arrow tab at the screen edge.
+    func setCollapsed(_ collapsed: Bool) {
+        settings.sidebarCollapsed = collapsed // settingsChanged() re-applies visibility
+    }
+
+    private func updateHandle() {
+        let show = settings.sidebarEnabled && settings.sidebarCollapsed && !peeking
+        guard show, let screen = currentScreen ?? resolveScreen() else {
+            handle?.orderOut(nil)
+            return
+        }
+        let panel = handle ?? {
+            let p = FloatingPanel(level: .floating)
+            p.hasShadow = true
+            return p
+        }()
+        handle = panel
+        let left = settings.sidebarEdge == .left
+        let size = NSSize(width: 18, height: 54)
+        let visible = screen.visibleFrame
+        panel.contentView = NSHostingView(rootView: AnyView(
+            Button { [weak self] in self?.setCollapsed(false) } label: {
+                Image(systemName: left ? "chevron.right" : "chevron.left")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: size.width, height: size.height)
+                    .background(UnevenRoundedRectangle(topLeadingRadius: left ? 0 : 9, bottomLeadingRadius: left ? 0 : 9,
+                                                       bottomTrailingRadius: left ? 9 : 0, topTrailingRadius: left ? 9 : 0,
+                                                       style: .continuous).fill(.regularMaterial))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Show the strip")
+        ))
+        let x = left ? visible.minX : visible.maxX - size.width
+        panel.setFrame(NSRect(x: x, y: visible.midY - size.height / 2, width: size.width, height: size.height), display: true)
+        panel.orderFrontRegardless()
     }
 
     private func applyVisibility(animated: Bool) {
         let visible = shouldBeVisible
+        updateHandle()
         state.windows.setPolling(visible)
         state.thumbnails.setActive(visible && !settings.stripIconsOnly) // icons mode: no captures
         state.spaces.setPolling(visible && settings.showSpaces)

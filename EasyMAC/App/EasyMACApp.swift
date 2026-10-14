@@ -71,6 +71,7 @@ struct MenuBarMenu: View {
     }
 
     private var sidebarTitle: String {
+        if settings.sidebarCollapsed { return "Show Sidebar" }
         if settings.autoHide && settings.sidebarEnabled { return "Reveal Sidebar" }
         return settings.sidebarEnabled ? "Hide Sidebar" : "Show Sidebar"
     }

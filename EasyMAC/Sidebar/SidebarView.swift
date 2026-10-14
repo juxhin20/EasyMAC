@@ -56,6 +56,23 @@ struct SidebarView: View {
             RoundedRectangle(cornerRadius: SidebarMetrics.cornerRadius, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
         }
+        .overlay(alignment: settings.sidebarEdge == .left ? .topTrailing : .topLeading) {
+            if settings.showCollapseArrow {
+                Button {
+                    state.sidebar.setCollapsed(true)
+                } label: {
+                    Image(systemName: settings.sidebarEdge == .left ? "chevron.left" : "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16, height: 16)
+                        .background(Circle().fill(Color.primary.opacity(0.08)))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Hide the strip — click the small arrow at the edge to bring it back")
+                .padding(5)
+            }
+        }
         .coordinateSpace(name: "sidebar")
         .onPreferenceChange(CellFramesKey.self) { frames in
             MainActor.assumeIsolated {

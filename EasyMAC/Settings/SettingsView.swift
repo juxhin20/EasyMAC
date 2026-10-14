@@ -343,6 +343,10 @@ private struct AppearanceSettings: View {
                     }
                 }
                 Toggle("“EasyMAC ⚙” footer", isOn: $settings.showFooter)
+                Toggle(isOn: $settings.showCollapseArrow) {
+                    Text("Hide arrow in the corner")
+                    Text("Click it to tuck the strip away; a small arrow stays at the screen edge to bring it back.")
+                }
                 Text("Hiding Tray or Folders here only removes them from the strip — they stay in the menu bar and the notch.")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
