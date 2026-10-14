@@ -408,6 +408,11 @@ private struct FilesSettings: View {
                     Text("Drop files on the notch → Tray")
                     Text("While you drag files, the notch opens a drop shelf. Click the notch to open the Tray.")
                 }
+                Toggle(isOn: $settings.notchAirDrop) {
+                    Text("AirDrop on the left of the drop shelf")
+                    Text("Drop on the left half to send with AirDrop, on the right half to keep in the Tray.")
+                }
+                .disabled(!settings.notchTray)
                 Toggle(isOn: $settings.showFilesIcon) {
                     Text("Folder icon in the menu bar")
                     Text("Opens Tray, Downloads and your other folders right under the icon.")

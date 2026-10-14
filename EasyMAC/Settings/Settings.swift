@@ -169,6 +169,7 @@ final class Settings {
     var clipboardPasteDirectly: Bool { didSet { store(clipboardPasteDirectly, "clipboardPasteDirectly") } }
     var showMenuBarIcon: Bool { didSet { store(showMenuBarIcon, "showMenuBarIcon") } }
     var notchHUD: Bool { didSet { store(notchHUD, "notchHUD") } }
+    var notchAirDrop: Bool { didSet { store(notchAirDrop, "notchAirDrop") } }
     var notchTray: Bool { didSet { store(notchTray, "notchTray") } }
     var notchAwakeIndicator: Bool { didSet { store(notchAwakeIndicator, "notchAwakeIndicator") } }
     var awakeMode: AwakeMode { didSet { store(awakeMode.rawValue, "awakeMode") } }
@@ -251,6 +252,7 @@ final class Settings {
         showMenuBarIcon = bool("showMenuBarIcon", true)
         notchAwakeIndicator = bool("notchAwakeIndicator", true)
         notchTray = bool("notchTray", true)
+        notchAirDrop = bool("notchAirDrop", true)
         awakeMode = choice("awakeMode", AwakeMode.display)
         awakeLastDuration = double("awakeLastDuration", 0)
         showTray = bool("showTray", true)

@@ -129,7 +129,7 @@ final class AppState {
             sidebar.settingsChanged()
         case "clipboardRetentionDays":
             clipboard.retentionChanged()
-        case "clipboardLimit", "clipboardPasteDirectly", "notchAwakeIndicator", "showMenuBarIcon":
+        case "clipboardLimit", "clipboardPasteDirectly", "notchAwakeIndicator", "showMenuBarIcon", "notchAirDrop":
             break
         case "mouseScrollDirection", "reverseMouseHorizontal":
             mouse.update()
