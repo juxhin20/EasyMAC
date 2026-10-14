@@ -1,7 +1,7 @@
 import AppKit
 
-/// Reverses the scroll direction of a classic mouse wheel only — trackpads and Magic Mouse
-/// (continuous scrolling devices) keep macOS's "natural" setting. One CGEventTap on scroll events,
+/// Reverses the scroll direction of mouse wheels only — trackpads and Magic Mouse (gesture-phase
+/// devices) keep macOS's "natural" setting. One CGEventTap on scroll events,
 /// installed only while the option is on. Needs Accessibility.
 @MainActor
 final class MouseController {
@@ -59,8 +59,11 @@ private func mouseTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: 
         MouseController.shared?.reenable()
         return Unmanaged.passUnretained(event)
     }
-    guard type == .scrollWheel,
-          event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0 else { // trackpad / Magic Mouse: leave alone
+    // Trackpads and Magic Mouse send gesture phases (began/changed/ended + momentum); a mouse wheel —
+    // even a smooth one like Logitech MagSpeed, which reports "continuous" — never does.
+    let phase = event.getIntegerValueField(.scrollWheelEventScrollPhase)
+    let momentum = event.getIntegerValueField(.scrollWheelEventMomentumPhase)
+    guard type == .scrollWheel, phase == 0, momentum == 0 else {
         return Unmanaged.passUnretained(event)
     }
     if MouseController.reverseVertical {
