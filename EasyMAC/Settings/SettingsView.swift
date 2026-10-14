@@ -188,6 +188,11 @@ private struct GeneralSettings: View {
                 Toggle("Keep Awake", isOn: $settings.showAwakeIcon)
                 Text("Hide just one icon by switching it off here. On macOS 26, ⌘-dragging an icon out can turn off EasyMAC in System Settings → Menu Bar, which hides all of its icons.")
                     .font(.caption).foregroundStyle(.secondary)
+                if MenuBarItems.blockedBySystem {
+                    Label("macOS is hiding EasyMAC's icons. In System Settings → Menu Bar, switch EasyMAC on under “Allow in the Menu Bar”.",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                }
                 HStack {
                     Text("Icons switched on but not showing?").font(.caption)
                     Spacer()

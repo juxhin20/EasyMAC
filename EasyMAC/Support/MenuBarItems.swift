@@ -10,6 +10,10 @@ import AppKit
 enum MenuBarItems {
     private static var observations: [String: NSKeyValueObservation] = [:]
     private static var removalHandlers: [String: () -> Void] = [:]
+    private static var createdAt: [String: Date] = [:]
+    /// True when macOS hides our icons right after we add them (System Settings → Menu Bar has
+    /// EasyMAC switched off). Settings shows a hint instead of fighting the system.
+    static var blockedBySystem = false
 
     static func make(_ name: String, onUserRemoved: @escaping @MainActor () -> Void) -> NSStatusItem {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -17,9 +21,19 @@ enum MenuBarItems {
         item.behavior = .removalAllowed
         item.isVisible = true // the setting is the source of truth; it's on if we're creating it
         removalHandlers[name] = onUserRemoved
+        createdAt[name] = Date()
         observations[name] = item.observe(\.isVisible, options: [.new]) { _, change in
             guard change.newValue == false else { return }
-            DispatchQueue.main.async { MainActor.assumeIsolated { MenuBarItems.removalHandlers[name]?() } }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    // Hidden instantly = macOS blocking the app, not a ⌘-drag: keep the setting on.
+                    if Date().timeIntervalSince(MenuBarItems.createdAt[name] ?? .distantPast) < 3 {
+                        MenuBarItems.blockedBySystem = true
+                        return
+                    }
+                    MenuBarItems.removalHandlers[name]?()
+                }
+            }
         }
         return item
     }
