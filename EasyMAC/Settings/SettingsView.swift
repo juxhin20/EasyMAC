@@ -4,14 +4,16 @@ import Observation
 import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, appearance, files, snapWheel, layouts, workspaces, mouse, hotkeys, excluded, permissions, about
+    case general, appearance, files, clipboard, keepAwake, snapWheel, layouts, workspaces, mouse, hotkeys, excluded, permissions, about
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .general: "General"
         case .appearance: "Sidebar"
-        case .files: "Files & Clipboard"
+        case .files: "Files & Tray"
+        case .clipboard: "Clipboard"
+        case .keepAwake: "Keep Awake"
         case .snapWheel: "Snap Wheel"
         case .layouts: "Layouts"
         case .workspaces: "Workspaces"
@@ -28,6 +30,8 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general: "gearshape.fill"
         case .appearance: "sidebar.left"
         case .files: "folder.fill"
+        case .clipboard: "doc.on.clipboard.fill"
+        case .keepAwake: "cup.and.saucer.fill"
         case .snapWheel: "circle.circle.fill"
         case .layouts: "rectangle.split.2x2.fill"
         case .workspaces: "square.stack.3d.up.fill"
@@ -44,10 +48,12 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general: .gray
         case .appearance: Brand.red
         case .files: .cyan
+        case .clipboard: .indigo
+        case .keepAwake: .brown
         case .snapWheel: .blue
         case .layouts: .teal
         case .workspaces: .purple
-        case .mouse: .brown
+        case .mouse: .gray
         case .hotkeys: .orange
         case .excluded: .pink
         case .permissions: .green
@@ -87,6 +93,8 @@ struct SettingsView: View {
                 case .general: GeneralSettings(state: state)
                 case .appearance: AppearanceSettings(state: state)
                 case .files: FilesSettings(state: state)
+                case .clipboard: ClipboardSettings(state: state)
+                case .keepAwake: KeepAwakeSettings(state: state)
                 case .snapWheel: SnapWheelSettings(state: state)
                 case .layouts: LayoutSettings(state: state)
                 case .workspaces: WorkspaceEditorView(state: state, nav: nav)
@@ -208,40 +216,10 @@ private struct GeneralSettings: View {
                     Text("Volume & brightness in the notch")
                     Text("Volume, mute and brightness keys show a sleek bar under the notch instead of the system popup.")
                 }
-                Toggle(isOn: $settings.notchTray) {
-                    Text("Drop files on the notch → Tray")
-                    Text("While you drag files, the notch opens a drop shelf. Click the notch to open the Tray.")
-                }
-                Toggle(isOn: $settings.notchAwakeIndicator) {
-                    Text("Keep Awake indicator next to the notch")
-                    Text("A small cup with a ring that shows the time left.")
-                }
             } header: {
                 Text("Notch")
             }
 
-            Section {
-                Toggle(isOn: $settings.showAwakeIcon) {
-                    Text("Show Keep Awake in the menu bar")
-                    Text("☕ while your Mac is kept awake, zzz when it may sleep. Click it for durations and mode.")
-                }
-                Picker("Mode", selection: $settings.awakeMode) {
-                    ForEach(AwakeMode.allCases) { mode in
-                        Label(mode.title, systemImage: mode.symbol).tag(mode)
-                    }
-                }
-                Text(settings.awakeMode.detail + ".")
-                    .font(.caption).foregroundStyle(.secondary)
-                LidPermissionRow()
-                HStack {
-                    Text(state.awake.isActive ? "Keeping your Mac awake" : "Off — your Mac can sleep")
-                        .foregroundStyle(state.awake.isActive ? Color.primary : Color.secondary)
-                    Spacer()
-                    Button(state.awake.isActive ? "Stop" : "Keep Awake") { state.awake.toggle() }
-                }
-            } header: {
-                Text("Keep Awake")
-            }
 
             Section {
                 Toggle("Hide other apps when restoring a workspace", isOn: $settings.hideOthersOnRestore)
@@ -426,6 +404,10 @@ private struct FilesSettings: View {
                     Text("Drop files on it from anywhere to keep them handy. Only the location is saved — nothing is copied.")
                 }
                 Toggle("Show pinned folders", isOn: $settings.showFiles)
+                Toggle(isOn: $settings.notchTray) {
+                    Text("Drop files on the notch → Tray")
+                    Text("While you drag files, the notch opens a drop shelf. Click the notch to open the Tray.")
+                }
                 Toggle(isOn: $settings.showFilesIcon) {
                     Text("Folder icon in the menu bar")
                     Text("Opens Tray, Downloads and your other folders right under the icon.")
@@ -467,6 +449,43 @@ private struct FilesSettings: View {
                 Text("Pinned folders")
             }
 
+
+            Section {
+                HStack {
+                    Text(shelf.tray.isEmpty ? "The tray is empty." : "\(shelf.tray.count) file\(shelf.tray.count == 1 ? "" : "s") in the tray.")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Open as Floating Window") { state.shelf.toggleFloat(.tray) }
+                    Button("Empty Tray") { shelf.clearTray() }.disabled(shelf.tray.isEmpty)
+                }
+            } header: {
+                Text("Tray")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func addFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Pin Folder"
+        NSApp.activate()
+        if panel.runModal() == .OK {
+            for url in panel.urls { shelf.addFolder(url.path) }
+        }
+    }
+}
+
+// MARK: - Clipboard
+
+private struct ClipboardSettings: View {
+    let state: AppState
+    @Bindable private var settings = Settings.shared
+
+    var body: some View {
+        Form {
             Section {
                 Toggle(isOn: $settings.clipboardEnabled) {
                     Text("Clipboard history")
@@ -503,32 +522,66 @@ private struct FilesSettings: View {
             } header: {
                 Text("Clipboard")
             }
-
-            Section {
-                HStack {
-                    Text(shelf.tray.isEmpty ? "The tray is empty." : "\(shelf.tray.count) file\(shelf.tray.count == 1 ? "" : "s") in the tray.")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Open as Floating Window") { state.shelf.toggleFloat(.tray) }
-                    Button("Empty Tray") { shelf.clearTray() }.disabled(shelf.tray.isEmpty)
-                }
-            } header: {
-                Text("Tray")
-            }
         }
         .formStyle(.grouped)
     }
+}
 
-    private func addFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = true
-        panel.prompt = "Pin Folder"
-        NSApp.activate()
-        if panel.runModal() == .OK {
-            for url in panel.urls { shelf.addFolder(url.path) }
+// MARK: - Keep Awake
+
+private struct KeepAwakeSettings: View {
+    let state: AppState
+    @Bindable private var settings = Settings.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: $settings.showAwakeIcon) {
+                    Text("Show Keep Awake in the menu bar")
+                    Text("A cup while your Mac is kept awake, zzz when it may sleep. Click it for durations and mode.")
+                }
+                Picker("Mode", selection: $settings.awakeMode) {
+                    ForEach(AwakeMode.allCases) { mode in
+                        Label(mode.title, systemImage: mode.symbol).tag(mode)
+                    }
+                }
+                Text(settings.awakeMode.detail + ".")
+                    .font(.caption).foregroundStyle(.secondary)
+                LidPermissionRow()
+                Toggle(isOn: $settings.notchAwakeIndicator) {
+                    Text("Keep Awake indicator next to the notch")
+                    Text("A small cup with a ring that shows the time left.")
+                }
+                HStack {
+                    Text(state.awake.isActive ? "Keeping your Mac awake" : "Off — your Mac can sleep")
+                        .foregroundStyle(state.awake.isActive ? Color.primary : Color.secondary)
+                    Spacer()
+                    Button(state.awake.isActive ? "Stop" : "Keep Awake") { state.awake.toggle() }
+                }
+            } header: {
+                Text("Keep Awake")
+            }
+            Section {
+                ForEach(AwakeController.durations, id: \.0) { entry in
+                    Button {
+                        state.awake.activate(for: entry.1)
+                    } label: {
+                        HStack {
+                            Text(entry.0)
+                            Spacer()
+                            if state.awake.isActive && settings.awakeLastDuration == (entry.1 ?? 0) {
+                                Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            } header: {
+                Text("Keep awake for")
+            }
         }
+        .formStyle(.grouped)
     }
 }
 
