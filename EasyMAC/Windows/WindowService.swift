@@ -66,6 +66,7 @@ final class WindowService {
     /// Confirmed non-user windows → owning pid (forgotten when that app quits; IDs get reused).
     @ObservationIgnored private var rejected: [CGWindowID: pid_t] = [:]
     @ObservationIgnored private var sweeping = false
+    @ObservationIgnored private var misses: [CGWindowID: Int] = [:]
     @ObservationIgnored private var isRefreshing = false
     @ObservationIgnored private var pendingRefresh = false
     @ObservationIgnored private var pendingForceSweep = false
@@ -269,6 +270,7 @@ final class WindowService {
         let alive = Set(result.map(\.windowID))
         firstSeen = firstSeen.filter { alive.contains($0.key) || onScreen.contains($0.key) }
         if rejected.count > 200 { rejected.removeAll() }
+        if misses.count > 400 { misses.removeAll() }
         rejected = rejected.filter { NSRunningApplication(processIdentifier: $0.value) != nil }
         activation = activation.filter { alive.contains($0.key) }
         pinned.removeAll { !alive.contains($0) }
@@ -285,8 +287,17 @@ final class WindowService {
             await sweep(extraPIDs: candidates.map(\.pid), excluded: excluded)
             // A window that was on screen while its (readable) app listed its windows, but isn't in that
             // list, is an invisible helper — remember that so it never flickers in again.
-            for (id, pid) in onScreenAtStart where axReadable.contains(pid) && axWindows[id] == nil {
-                rejected[id] = pid
+            // Only after two separate sweeps both miss it, and only when its app did list other windows
+            // (an app reporting no windows at all is usually still starting up — never trust that).
+            let pidsWithWindows = Set(axWindows.values.map(\.pid))
+            for (id, pid) in onScreenAtStart {
+                if axWindows[id] != nil {
+                    misses[id] = nil
+                } else if axReadable.contains(pid), pidsWithWindows.contains(pid) {
+                    let count = (misses[id] ?? 0) + 1
+                    misses[id] = count
+                    if count >= 2 { rejected[id] = pid }
+                }
             }
             sweeping = false
             requestRefresh()
