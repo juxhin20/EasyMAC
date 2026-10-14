@@ -125,6 +125,17 @@ nav .links a:hover{color:var(--text)}
 .keys td:last-child{text-align:right;white-space:nowrap}
 kbd{font:600 13px/1 -apple-system,sans-serif;background:rgba(255,255,255,.1);border:1px solid var(--line);border-bottom-width:2px;border-radius:7px;padding:5px 8px;margin-left:3px;display:inline-block}
 
+.rel{display:grid;gap:16px;margin-top:36px}
+.rel article{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px 26px}
+.rel header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:10px}
+.rel h3{font-size:20px}
+.rel .tag{font-size:12px;font-weight:700;letter-spacing:.04em;padding:4px 10px;border-radius:999px;background:rgba(210,32,39,.18);color:#ff8a8f}
+.rel time{color:var(--muted);font-size:13px}
+.rel .dl{margin-left:auto;font-size:13px;color:var(--muted)}
+.rel .dl a{color:var(--text)}
+.rel ul{margin:0 0 0 18px;color:var(--muted);display:grid;gap:6px}
+.rel li b{color:var(--text)}
+.rel h2{display:none}
 /* install */
 .install{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:36px}
 @media(max-width:920px){.install{grid-template-columns:repeat(2,1fr)}}
@@ -156,6 +167,7 @@ details p{color:var(--muted);margin-top:10px;font-size:15px}
       <a href="#snap">Snap wheel</a>
       <a href="#workspaces">Workspaces</a>
       <a href="#shortcuts">Shortcuts</a>
+      <a href="#whatsnew">What's new</a>
       <a class="btn small" href="EasyMAC-1.0.0.dmg">Download</a>
     </div>
   </div>
@@ -210,6 +222,9 @@ details p{color:var(--muted);margin-top:10px;font-size:15px}
       <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg></div><h3>Project workspaces</h3><p>Save the apps and window positions you use for a project. One click or <kbd>⌥1</kbd> brings the whole layout back, opening apps if needed.</p></div>
       <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="18" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></div><h3>Tiling layouts</h3><p>50/50, 60/40, thirds, main + stack and grid — for all visible windows at once. Windows always leave room for the strip.</p></div>
       <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10"/></svg></div><h3>Keyboard first</h3><p>Snap with <kbd>⌃⌥</kbd> + arrows (repeat for ⅔ and ⅓), cycle windows with <kbd>⌥Tab</kbd>, toggle the strip with <kbd>⌥⇧S</kbd>. Every shortcut is yours to change.</p></div>
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></div><h3>Files & Tray</h3><p>Downloads, Desktop and a Tray one click away. Drag files straight into Chrome or WhatsApp, Space to preview, float a list on top of every app.</p></div>
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg></div><h3>Clipboard history</h3><p>Press <kbd>⌥⇧V</kbd> for a bar of everything you copied — text, links, images, files. Click to paste. Password managers are skipped.</p></div>
+      <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg></div><h3>Notch & Keep Awake</h3><p>Volume and brightness live in the notch. Keep your Mac awake for a while or with the lid closed — a small ring by the notch shows the time left.</p></div>
       <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg></div><h3>Light & native</h3><p>Pure Swift, Liquid Glass on macOS 26, starts at login, ~1–3% CPU while visible and nothing while hidden. Updates install themselves.</p></div>
     </div>
   </div>
@@ -273,7 +288,19 @@ details p{color:var(--muted);margin-top:10px;font-size:15px}
       <tr><td>Snap top / bottom</td><td><kbd>⌃</kbd><kbd>⌥</kbd><kbd>↑</kbd> <kbd>↓</kbd></td></tr>
       <tr><td>Maximize · Center · Restore size</td><td><kbd>⌃</kbd><kbd>⌥</kbd><kbd>↩</kbd> · <kbd>C</kbd> · <kbd>⌫</kbd></td></tr>
       <tr><td>Tile all visible windows</td><td><kbd>⌃</kbd><kbd>⌥</kbd><kbd>L</kbd></td></tr>
+      <tr><td>Clipboard history</td><td><kbd>⌥</kbd><kbd>⇧</kbd><kbd>V</kbd></td></tr>
     </table>
+  </div>
+</section>
+
+<section id="whatsnew">
+  <div class="wrap">
+    <span class="eyebrow reveal">Release notes</span>
+    <h2 class="reveal">What's new</h2>
+    <p class="lead reveal">Every version, newest first. Installed copies update themselves — or download any version below.</p>
+    <div class="rel">
+<!--RELEASES-->
+    </div>
   </div>
 </section>
 
@@ -299,7 +326,7 @@ details p{color:var(--muted);margin-top:10px;font-size:15px}
     <h2>Ready to tidy up your Mac?</h2>
     <p class="lead" style="margin:0 auto">Free for macOS 14 Sonoma and later.</p>
     <div class="cta"><a class="btn" href="EasyMAC-1.0.0.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>Download EasyMAC 1.0.0</a></div>
-    <p class="meta">2.8 MB · Signed with Developer ID and notarized by Apple</p>
+    <p class="meta">Signed with Developer ID and notarized by Apple</p>
   </div>
 </section>
 

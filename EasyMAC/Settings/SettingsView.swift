@@ -452,7 +452,7 @@ private struct FilesSettings: View {
                     }
                     Toggle("Paste directly when choosing an item", isOn: $settings.clipboardPasteDirectly)
                     Picker("Keep history", selection: $settings.clipboardRetentionDays) {
-                        Text("Until restart (memory only)").tag(0)
+                        Text("While EasyMAC runs (kept across updates)").tag(0)
                         Text("1 day").tag(1)
                         Text("3 days").tag(3)
                         Text("5 days").tag(5)

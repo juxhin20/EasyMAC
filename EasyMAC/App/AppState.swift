@@ -96,6 +96,7 @@ final class AppState {
     func willTerminate() {
         workspaces.saveNow()
         awake.willTerminate()
+        clipboard.saveForRelaunch()
     }
 
     private func settingsChanged(key: String?) {

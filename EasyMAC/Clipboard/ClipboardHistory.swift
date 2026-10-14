@@ -209,9 +209,41 @@ final class ClipboardHistory {
         }
     }
 
+    // MARK: - Handoff across a restart (updates) in "until restart" mode
+
+    private static var handoffMarker: URL { directory.appendingPathComponent("handoff") }
+
+    /// Called when EasyMAC quits. In memory-only mode the history is written once so an update /
+    /// quick relaunch can pick it up; it is read back within 3 minutes and deleted right away.
+    func saveForRelaunch() {
+        saveTask?.cancel()
+        guard settings.clipboardEnabled, !items.isEmpty else { return }
+        Self.save(items)
+        if settings.clipboardRetentionDays == 0 {
+            try? Data().write(to: Self.handoffMarker)
+        }
+    }
+
     private func load() {
-        guard settings.clipboardRetentionDays > 0,
-              let data = try? Data(contentsOf: Self.directory.appendingPathComponent("index.json")),
+        let fm = FileManager.default
+        let handoff = Self.handoffMarker
+        var isHandoff = false
+        if settings.clipboardRetentionDays == 0 {
+            guard let attributes = try? fm.attributesOfItem(atPath: handoff.path),
+                  let date = attributes[.modificationDate] as? Date else {
+                try? fm.removeItem(at: Self.directory) // stale memory-only data never lingers
+                return
+            }
+            isHandoff = Date().timeIntervalSince(date) < 180
+            if !isHandoff {
+                try? fm.removeItem(at: Self.directory)
+                return
+            }
+        }
+        defer {
+            if isHandoff { try? fm.removeItem(at: Self.directory) }
+        }
+        guard let data = try? Data(contentsOf: Self.directory.appendingPathComponent("index.json")),
               let stored = try? JSONDecoder().decode([Stored].self, from: data) else { return }
         items = stored.compactMap { entry in
             let kind: ClipItem.Kind?
