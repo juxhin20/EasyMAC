@@ -133,6 +133,7 @@ final class SidebarController {
         let visible = shouldBeVisible
         state.windows.setPolling(visible)
         state.thumbnails.setActive(visible)
+        state.spaces.setPolling(visible && settings.showSpaces)
         if visible && !isRevealed {
             reveal(animated: animated)
         } else if !visible && isRevealed {

@@ -22,6 +22,7 @@ final class SpacesService {
     @ObservationIgnored var screenProvider: () -> NSScreen? = { NSScreen.main }
     @ObservationIgnored private var observer: NSObjectProtocol?
     @ObservationIgnored private var switching = false
+    @ObservationIgnored private var timer: Timer?
 
     private typealias ConnectionFn = @convention(c) () -> Int32
     private typealias CopySpacesFn = @convention(c) (Int32) -> Unmanaged<CFArray>?
@@ -45,6 +46,24 @@ final class SpacesService {
             MainActor.assumeIsolated { self?.refresh() }
         }
         refresh()
+    }
+
+    /// Adding/removing desktops in Mission Control posts no notification, so poll (cheap: one
+    /// WindowServer call, publishes only on change) while the row is on screen.
+    func setPolling(_ active: Bool) {
+        if active {
+            guard timer == nil else { return }
+            let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refresh() }
+            }
+            timer.tolerance = 0.1
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+            refresh()
+        } else {
+            timer?.invalidate()
+            timer = nil
+        }
     }
 
     func refresh() {
