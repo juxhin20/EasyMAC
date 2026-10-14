@@ -106,11 +106,16 @@ final class ThumbnailService {
         let changedSet = Set(windows.map(\.windowID)) != Set(visible.map(\.windowID))
         visible = windows
         if changedSet { contentStamp = .distantPast }
-        let alive = Set(windows.map(\.windowID))
-        if boxes.keys.contains(where: { !alive.contains($0) }) {
-            boxes = boxes.filter { alive.contains($0.key) }
-            stamps = stamps.filter { alive.contains($0.key) }
-            captured = captured.filter { alive.contains($0.key) }
+        // Keep thumbnails of windows that just left the list (other desktops) so swiping back shows them
+        // instantly; only trim the oldest when the cache grows past 80 windows.
+        if boxes.count > 80 {
+            let keep = Set(windows.map(\.windowID))
+            let oldest = stamps.filter { !keep.contains($0.key) }.sorted { $0.value < $1.value }.prefix(boxes.count - 80).map(\.key)
+            for id in oldest {
+                boxes[id] = nil
+                stamps[id] = nil
+                captured[id] = nil
+            }
         }
         guard isActive, !displaysAsleep else { return }
         for window in windows where !window.isOffscreen && (image(window.windowID) == nil || changedSinceCapture(window)) {

@@ -63,6 +63,9 @@ final class WindowService {
     @ObservationIgnored private var lastSweep = Date.distantPast
     @ObservationIgnored private var lastTop: CGWindowID?
     @ObservationIgnored private var lastOnScreen = Set<CGWindowID>()
+    /// Confirmed non-user windows → owning pid (forgotten when that app quits; IDs get reused).
+    @ObservationIgnored private var rejected: [CGWindowID: pid_t] = [:]
+    @ObservationIgnored private var sweeping = false
     @ObservationIgnored private var isRefreshing = false
     @ObservationIgnored private var pendingRefresh = false
     @ObservationIgnored private var pendingForceSweep = false
@@ -196,18 +199,20 @@ final class WindowService {
         let disappeared = !lastOnScreen.subtracting(currentIDs).isEmpty // minimized or closed: ask AX which
         lastOnScreen = currentIDs
         let sweepDue = forceSweep || hasUnconfirmed || disappeared || now.timeIntervalSince(lastSweep) > 4.0
+        // Never wait for the AX sweep (one slow app can take ~0.5 s): publish now from the fast CG list,
+        // sweep in the background, and refresh again quietly when it finishes.
         if sweepDue, PermissionCache.accessibility {
-            await sweep(extraPIDs: candidates.map(\.pid), excluded: excluded)
+            startBackgroundSweep(candidates: candidates, excluded: excluded)
         }
 
         var result: [WindowInfo] = []
         var onScreen = Set<CGWindowID>()
         for record in candidates {
             let snapshot = axWindows[record.id]
-            if axReadable.contains(record.pid) {
-                // The app answers AX: only trust windows AX knows about (drops invisible helper windows).
-                guard let snapshot, snapshot.isUserWindow else { continue }
-            }
+            // Skip only windows a sweep has *confirmed* are not user windows (invisible helpers, palettes).
+            // Unknown windows — e.g. the ones on a desktop you just swiped to — show immediately.
+            if rejected[record.id] == record.pid { continue }
+            if let snapshot, !snapshot.isUserWindow { continue }
             let app = appInfo(record.pid)
             onScreen.insert(record.id)
             result.append(WindowInfo(
@@ -263,11 +268,29 @@ final class WindowService {
         // Forget windows that are gone (IDs get reused, so stale state must not leak).
         let alive = Set(result.map(\.windowID))
         firstSeen = firstSeen.filter { alive.contains($0.key) || onScreen.contains($0.key) }
+        if rejected.count > 200 { rejected.removeAll() }
+        rejected = rejected.filter { NSRunningApplication(processIdentifier: $0.value) != nil }
         activation = activation.filter { alive.contains($0.key) }
         pinned.removeAll { !alive.contains($0) }
 
         allWindows = result
         resort()
+    }
+
+    private func startBackgroundSweep(candidates: [CGWindowRecord], excluded: Set<String>) {
+        guard !sweeping else { return }
+        sweeping = true
+        let onScreenAtStart = candidates.map { ($0.id, $0.pid) }
+        Task {
+            await sweep(extraPIDs: candidates.map(\.pid), excluded: excluded)
+            // A window that was on screen while its (readable) app listed its windows, but isn't in that
+            // list, is an invisible helper — remember that so it never flickers in again.
+            for (id, pid) in onScreenAtStart where axReadable.contains(pid) && axWindows[id] == nil {
+                rejected[id] = pid
+            }
+            sweeping = false
+            requestRefresh()
+        }
     }
 
     private func sweep(extraPIDs: [pid_t], excluded: Set<String>) async {
