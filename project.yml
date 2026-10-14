@@ -48,7 +48,6 @@ targets:
         NSHumanReadableCopyright: "© 2026 AppAlbania"
         NSAccessibilityUsageDescription: "EasyMAC uses Accessibility to focus, move and resize your windows."
         NSScreenCaptureUsageDescription: "EasyMAC uses Screen Recording to show live thumbnails of your windows."
-        NSAppleEventsUsageDescription: "EasyMAC reads the current Spotify track to show it in the notch."
         NSDesktopFolderUsageDescription: "EasyMAC lists your Desktop files so you can drag them into other apps."
         NSDownloadsFolderUsageDescription: "EasyMAC lists your Downloads so you can drag them into other apps."
         NSDocumentsFolderUsageDescription: "EasyMAC lists folders you pin so you can drag files into other apps."
@@ -61,7 +60,6 @@ targets:
       path: EasyMAC/EasyMAC.entitlements
       properties:
         com.apple.security.app-sandbox: false
-        com.apple.security.automation.apple-events: true
     settings:
       base:
         PRODUCT_NAME: EasyMAC

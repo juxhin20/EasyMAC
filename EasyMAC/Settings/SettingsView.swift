@@ -185,10 +185,6 @@ private struct GeneralSettings: View {
                     Text("Volume & brightness in the notch")
                     Text("Volume, mute and brightness keys show a sleek bar under the notch instead of the system popup.")
                 }
-                Toggle(isOn: $settings.notchNowPlaying) {
-                    Text("Now playing in the notch")
-                    Text("Album art and live bars while Spotify or Apple Music plays; hover for title and controls.")
-                }
                 Toggle(isOn: $settings.notchAwakeIndicator) {
                     Text("Keep Awake indicator next to the notch")
                     Text("A small cup with a ring that shows the time left.")
@@ -662,12 +658,14 @@ private struct MouseSettings: View {
     var body: some View {
         Form {
             Section {
-                Toggle(isOn: $settings.reverseMouseScroll) {
-                    Text("Reverse scrolling for mouse")
-                    Text("Flips the scroll wheel of a regular mouse. Your trackpad and Magic Mouse keep macOS's natural scrolling.")
+                Picker(selection: $settings.mouseScrollDirection) {
+                    ForEach(MouseScrollDirection.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    Text("Mouse wheel direction")
+                    Text("Only the mouse changes — your trackpad keeps its own setting (now: \(MouseController.systemNatural ? "natural" : "standard")).")
                 }
-                Toggle("Also reverse sideways scrolling", isOn: $settings.reverseMouseHorizontal)
-                    .disabled(!settings.reverseMouseScroll)
+                Toggle("Apply to sideways scrolling too", isOn: $settings.reverseMouseHorizontal)
+                    .disabled(settings.mouseScrollDirection == .system)
                 if !state.permissions.accessibilityGranted {
                     Label("Needs Accessibility permission.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 }

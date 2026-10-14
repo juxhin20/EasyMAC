@@ -147,12 +147,6 @@ final class NotchController {
     private var hudPanel: NotchPanel?
     private var pillPanel: NotchPanel?
     private var hideTask: Task<Void, Never>?
-    private var musicPanel: NotchPanel?
-    private var musicHost: TrackingHostingView?
-    private var musicExpanded = false
-    private var collapseTask: Task<Void, Never>?
-    private var pausedSince: Date?
-    private var musicHideTask: Task<Void, Never>?
     private var pillTimer: Timer?
     nonisolated(unsafe) private var tap: CFMachPort?
     nonisolated(unsafe) private var runLoopSource: CFRunLoopSource?
@@ -167,16 +161,12 @@ final class NotchController {
     func start() {
         updateTap()
         observeAwake()
-        observeMusic()
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.hudPanel = nil
                 self?.pillPanel?.orderOut(nil)
                 self?.pillPanel = nil
-                self?.musicPanel?.orderOut(nil)
-                self?.musicPanel = nil
                 self?.updatePill()
-                self?.updateMusic()
             }
         }
     }
@@ -194,21 +184,16 @@ final class NotchController {
     private func installTap() {
         guard tap == nil else { return }
         let mask = CGEventMask(1 << 14) | CGEventMask(1 << CGEventType.keyDown.rawValue) // NX_SYSDEFINED + keyDown
-        guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                          eventsOfInterest: mask, callback: notchTapCallback, userInfo: nil) else {
+        guard let created = EventTapThread.shared.addTap(mask: mask, callback: notchTapCallback) else {
             Log.app.error("Notch HUD: could not create event tap")
             return
         }
-        self.tap = tap
-        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
-        runLoopSource = source
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
+        tap = created.0
+        runLoopSource = created.1
     }
 
     private func removeTap() {
-        if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
-        if let runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes) }
+        if let tap, let runLoopSource { EventTapThread.shared.removeTap(tap, runLoopSource) }
         tap = nil
         runLoopSource = nil
     }
@@ -217,33 +202,40 @@ final class NotchController {
         if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
     }
 
-    /// Returns true when the key was handled (and should be swallowed).
-    func handle(key: Int32, down: Bool, fine: Bool) -> Bool {
+    /// Runs on the event-tap thread (CoreAudio / DisplayServices are thread-safe). Returns true when
+    /// the key was handled and should be swallowed; the HUD is drawn on the main thread.
+    nonisolated static func handle(key: Int32, down: Bool, fine: Bool) -> Bool {
         let step: Float = fine ? 1.0 / 64 : 1.0 / 16
+        let hud: (NotchModel.Kind, Float, Bool)?
         switch key {
         case 0, 1: // NX_KEYTYPE_SOUND_UP / DOWN
-            guard down, let current = SystemControls.volume else { return SystemControls.volume != nil }
+            guard let current = SystemControls.volume else { return false }
+            guard down else { return true }
             let base = SystemControls.isMuted == true && key == 0 ? 0 : current
-            let target = ((base + (key == 0 ? step : -step)) / step).rounded() * step
+            let target = min(max(((base + (key == 0 ? step : -step)) / step).rounded() * step, 0), 1)
             guard SystemControls.setVolume(target) else { return false }
             if target <= 0 { SystemControls.setMuted(true) }
-            show(.volume, level: SystemControls.volume ?? target, muted: SystemControls.isMuted ?? false)
-            return true
+            hud = (.volume, SystemControls.volume ?? target, SystemControls.isMuted ?? false)
         case 7: // NX_KEYTYPE_MUTE
-            guard down else { return SystemControls.isMuted != nil }
-            guard let muted = SystemControls.isMuted, SystemControls.setMuted(!muted) else { return false }
-            show(.volume, level: SystemControls.volume ?? 0, muted: !muted)
-            return true
+            guard let muted = SystemControls.isMuted else { return false }
+            guard down else { return true }
+            guard SystemControls.setMuted(!muted) else { return false }
+            hud = (.volume, SystemControls.volume ?? 0, !muted)
         case 2, 3: // NX_KEYTYPE_BRIGHTNESS_UP / DOWN
-            guard down else { return SystemControls.brightness != nil }
             guard let current = SystemControls.brightness else { return false }
+            guard down else { return true }
             let target = min(max(((current + (key == 2 ? step : -step)) / step).rounded() * step, 0), 1)
             guard SystemControls.setBrightness(target) else { return false }
-            show(.brightness, level: target, muted: false)
-            return true
+            hud = (.brightness, target, false)
         default:
             return false
         }
+        if let hud {
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { NotchController.shared?.show(hud.0, level: hud.1, muted: hud.2) }
+            }
+        }
+        return true
     }
 
     // MARK: - HUD
@@ -254,7 +246,7 @@ final class NotchController {
         show(.volume, level: SystemControls.volume ?? 0.5, muted: SystemControls.isMuted ?? false, hold: 6)
     }
 
-    private func show(_ kind: NotchModel.Kind, level: Float, muted: Bool, hold: Double = 1.5) {
+    func show(_ kind: NotchModel.Kind, level: Float, muted: Bool, hold: Double = 1.5) {
         guard let screen = NSScreen.notchScreen ?? NSScreen.withMouse else { return }
         let barHeight = max(screen.frame.maxY - screen.visibleFrame.maxY, 24)
         let notch = screen.notchRect ?? NSRect(x: screen.frame.midX - 40, y: screen.frame.maxY - barHeight, width: 80, height: barHeight)
@@ -283,105 +275,6 @@ final class NotchController {
         panel.setFrame(NSRect(x: notch.midX - width / 2, y: screen.frame.maxY - notch.height, width: width, height: notch.height), display: false)
         panel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: notch.width, height: notch.height))
         return panel
-    }
-
-    // MARK: - Now playing
-
-    private var musicVisible: Bool { musicPanel?.isVisible == true }
-
-    private func observeMusic() {
-        withObservationTracking {
-            _ = state.nowPlaying.title
-            _ = state.nowPlaying.isPlaying
-            _ = state.nowPlaying.artwork
-            _ = state.settings.notchNowPlaying
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.updateMusic()
-                self?.observeMusic()
-            }
-        }
-        updateMusic()
-    }
-
-    /// Shown while something plays; after a pause it stays 8 s (or while hovered), then tucks away.
-    private func updateMusic() {
-        let player = state.nowPlaying
-        guard state.settings.notchNowPlaying, player.hasTrack, let screen = NSScreen.notchScreen, let notch = screen.notchRect else {
-            hideMusic()
-            return
-        }
-        musicHideTask?.cancel()
-        if !player.isPlaying {
-            if pausedSince == nil { pausedSince = Date() }
-            musicHideTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(8))
-                guard !Task.isCancelled, let self, !self.musicExpanded, !self.state.nowPlaying.isPlaying else { return }
-                self.hideMusic()
-            }
-        } else {
-            pausedSince = nil
-        }
-        let panel = musicPanel ?? makeMusicPanel(notch: notch)
-        musicPanel = panel
-        layoutMusic(notch: notch, screen: screen, animated: false)
-        if !panel.isVisible { panel.orderFrontRegardless() }
-        updatePill()
-    }
-
-    private func hideMusic() {
-        musicExpanded = false
-        musicPanel?.orderOut(nil)
-        updatePill()
-    }
-
-    private func makeMusicPanel(notch: NSRect) -> NotchPanel {
-        let panel = NotchPanel(level: .statusBar, ignoresMouse: false)
-        panel.hasShadow = false
-        let host = TrackingHostingView(rootView: AnyView(EmptyView()))
-        host.onMouse = { [weak self] point in self?.musicHover(point != nil) }
-        panel.contentView = host
-        musicHost = host
-        return panel
-    }
-
-    private func layoutMusic(notch: NSRect, screen: NSScreen, animated: Bool) {
-        guard let panel = musicPanel else { return }
-        musicHost?.rootView = AnyView(NowPlayingNotchView(player: state.nowPlaying, expanded: musicExpanded,
-                                                          notchWidth: notch.width, height: notch.height))
-        let wing = musicExpanded ? NowPlayingNotchView.expandedWing : NowPlayingNotchView.wing
-        let width = notch.width + wing * 2
-        let height = notch.height + (musicExpanded ? NowPlayingNotchView.expandedExtra : 0)
-        let frame = NSRect(x: notch.midX - width / 2, y: screen.frame.maxY - height, width: width, height: height)
-        // Grow before animating open; shrink after the content has closed (keeps clicks outside free).
-        if musicExpanded || !animated {
-            panel.setFrame(frame, display: true)
-        } else {
-            Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(300))
-                guard let self, !self.musicExpanded else { return }
-                panel.setFrame(frame, display: true)
-            }
-        }
-    }
-
-    private func musicHover(_ inside: Bool) {
-        guard let screen = NSScreen.notchScreen, let notch = screen.notchRect else { return }
-        collapseTask?.cancel()
-        if inside {
-            guard !musicExpanded else { return }
-            musicExpanded = true
-            musicHideTask?.cancel()
-            layoutMusic(notch: notch, screen: screen, animated: true)
-        } else {
-            collapseTask = Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(350))
-                guard !Task.isCancelled, let self else { return }
-                self.musicExpanded = false
-                self.layoutMusic(notch: notch, screen: screen, animated: true)
-                self.updateMusic()
-            }
-        }
     }
 
     // MARK: - Keep Awake pill
@@ -419,9 +312,8 @@ final class NotchController {
             return p
         }()
         pillPanel = panel
-        // Sits right after the now-playing wing when music shows, else tucked 10 pt under the notch.
-        let offset = musicVisible && !musicExpanded ? NowPlayingNotchView.wing : 0
-        panel.setFrameOrigin(NSPoint(x: notch.maxX - 10 + offset, y: notch.minY))
+        // Tucked 10 pt under the notch so the black shapes read as one piece.
+        panel.setFrameOrigin(NSPoint(x: notch.maxX - 10, y: notch.minY))
         panel.orderFrontRegardless()
         refreshProgress(total: total)
         pillTimer?.invalidate()
@@ -464,8 +356,5 @@ private func notchTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: 
         fine = event.flags.contains([.maskAlternate, .maskShift])
     }
     guard [0, 1, 2, 3, 7].contains(key) else { return Unmanaged.passUnretained(event) }
-    let handled = MainActor.assumeIsolated {
-        NotchController.shared?.handle(key: key, down: down, fine: fine) ?? false
-    }
-    return handled ? nil : Unmanaged.passUnretained(event)
+    return NotchController.handle(key: key, down: down, fine: fine) ? nil : Unmanaged.passUnretained(event)
 }
