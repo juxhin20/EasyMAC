@@ -157,7 +157,7 @@ final class FileShelfController {
     func updateStatusItem() {
         let wanted = settings.showFilesIcon && (settings.showTray || settings.showFiles)
         if wanted, statusItem == nil {
-            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            let item = MenuBarItems.make("files") { [weak self] in self?.settings.showFilesIcon = false }
             let image = NSImage(systemSymbolName: "folder", accessibilityDescription: "Files & Tray")
             image?.isTemplate = true
             item.button?.image = image?.withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
@@ -167,7 +167,7 @@ final class FileShelfController {
             item.menu = menu
             statusItem = item
         } else if !wanted, let statusItem {
-            NSStatusBar.system.removeStatusItem(statusItem)
+            MenuBarItems.remove(statusItem, name: "files")
             self.statusItem = nil
         }
     }

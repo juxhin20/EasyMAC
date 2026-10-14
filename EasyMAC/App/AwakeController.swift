@@ -60,14 +60,14 @@ final class AwakeController: NSObject, NSMenuDelegate {
     func updateItemVisibility() {
         if settings.showAwakeIcon {
             guard item == nil else { return }
-            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            let item = MenuBarItems.make("awake") { [weak self] in self?.settings.showAwakeIcon = false }
             let menu = NSMenu()
             menu.delegate = self
             item.menu = menu
             self.item = item
             updateIcon()
         } else if let item {
-            NSStatusBar.system.removeStatusItem(item)
+            MenuBarItems.remove(item, name: "awake")
             self.item = nil
         }
     }

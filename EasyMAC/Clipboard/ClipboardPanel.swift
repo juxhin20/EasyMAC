@@ -197,7 +197,7 @@ final class ClipboardPanelController {
     func updateStatusItem() {
         let wanted = state.settings.clipboardEnabled && state.settings.showClipboardIcon
         if wanted, statusItem == nil {
-            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            let item = MenuBarItems.make("clipboard") { [weak self] in self?.state.settings.showClipboardIcon = false }
             let image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard history")
             image?.isTemplate = true
             item.button?.image = image?.withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
@@ -206,7 +206,7 @@ final class ClipboardPanelController {
             item.button?.action = #selector(statusClicked)
             statusItem = item
         } else if !wanted, let statusItem {
-            NSStatusBar.system.removeStatusItem(statusItem)
+            MenuBarItems.remove(statusItem, name: "clipboard")
             self.statusItem = nil
         }
     }

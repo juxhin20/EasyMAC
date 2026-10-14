@@ -181,6 +181,24 @@ private struct GeneralSettings: View {
             }
 
             Section {
+                Toggle("EasyMAC (sidebar, workspaces, settings)", isOn: $settings.showMenuBarIcon)
+                Toggle("Files & Tray", isOn: $settings.showFilesIcon)
+                Toggle("Clipboard history", isOn: Binding(get: { settings.showClipboardIcon && settings.clipboardEnabled },
+                                                           set: { settings.showClipboardIcon = $0; if $0 { settings.clipboardEnabled = true } }))
+                Toggle("Keep Awake", isOn: $settings.showAwakeIcon)
+                Text("Hide just one icon by switching it off here. On macOS 26, ⌘-dragging an icon out can turn off EasyMAC in System Settings → Menu Bar, which hides all of its icons.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text("Icons switched on but not showing?").font(.caption)
+                    Spacer()
+                    Button("Open Menu Bar Settings") { SystemTweaks.openMenuBarSettings() }
+                        .controlSize(.small)
+                }
+            } header: {
+                Text("Menu bar icons")
+            }
+
+            Section {
                 Toggle(isOn: $settings.notchHUD) {
                     Text("Volume & brightness in the notch")
                     Text("Volume, mute and brightness keys show a sleek bar under the notch instead of the system popup.")

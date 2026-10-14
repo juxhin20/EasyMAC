@@ -45,6 +45,7 @@ final class AppState {
         Log.app.info("EasyMAC \(Bundle.main.shortVersion, privacy: .public) starting (login launch: \(launchedAtLogin))")
 
         applyActivationPolicy()
+        MenuBarItems.cleanUpLegacyKeys()
         launchAtLogin.enableOnFirstRun()
 
         windows.startObserving()

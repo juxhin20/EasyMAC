@@ -109,6 +109,13 @@ enum SystemTweaks {
         if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") { NSWorkspace.shared.open(url) }
     }
 
+    /// macOS 26: System Settings → Menu Bar ("Allow in the Menu Bar" per app).
+    static func openMenuBarSettings() {
+        for id in ["com.apple.ControlCenter-Settings.extension", "com.apple.MenuBar-Settings.extension"] {
+            if let url = URL(string: "x-apple.systempreferences:" + id), NSWorkspace.shared.open(url) { return }
+        }
+    }
+
     static func openDesktopAndDockSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.Desktop-Settings.extension") { NSWorkspace.shared.open(url) }
     }
