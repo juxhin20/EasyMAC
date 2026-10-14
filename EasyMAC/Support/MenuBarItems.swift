@@ -9,21 +9,24 @@ import AppKit
 @MainActor
 enum MenuBarItems {
     private static var observations: [String: NSKeyValueObservation] = [:]
+    private static var removalHandlers: [String: () -> Void] = [:]
 
     static func make(_ name: String, onUserRemoved: @escaping @MainActor () -> Void) -> NSStatusItem {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.autosaveName = "easymac." + name
         item.behavior = .removalAllowed
         item.isVisible = true // the setting is the source of truth; it's on if we're creating it
+        removalHandlers[name] = onUserRemoved
         observations[name] = item.observe(\.isVisible, options: [.new]) { _, change in
             guard change.newValue == false else { return }
-            DispatchQueue.main.async { MainActor.assumeIsolated { onUserRemoved() } }
+            DispatchQueue.main.async { MainActor.assumeIsolated { MenuBarItems.removalHandlers[name]?() } }
         }
         return item
     }
 
     static func remove(_ item: NSStatusItem, name: String) {
         observations[name] = nil
+        removalHandlers[name] = nil
         NSStatusBar.system.removeStatusItem(item)
     }
 
