@@ -98,8 +98,20 @@ final class WindowService {
                         AppIconCache.forget(pid: pid)
                     }
                     self.requestRefresh(forceSweep: true)
+                    if name == NSWorkspace.activeSpaceDidChangeNotification { self.burstAfterSpaceChange() }
                 }
             })
+        }
+    }
+
+    /// macOS posts "space changed" a moment before its window list has fully settled; re-check a few
+    /// times right after a switch instead of waiting up to a second for the next poll.
+    private func burstAfterSpaceChange() {
+        Task { [weak self] in
+            for delay in [100, 250, 500] {
+                try? await Task.sleep(for: .milliseconds(delay == 100 ? 100 : delay == 250 ? 150 : 250))
+                self?.requestRefresh()
+            }
         }
     }
 
@@ -176,7 +188,12 @@ final class WindowService {
             }
         }
 
-        let records = await Task.detached(priority: .userInitiated) { CGWindowRecord.onScreen() }.value
+        let records = await Task.detached(priority: .userInitiated) { () -> [CGWindowRecord] in
+            let all = CGWindowRecord.onScreen()
+            // Drop windows of the desktop you're swiping *to* until the swipe completes.
+            let off = SpaceMembership.windowsOffCurrentSpace(all.filter { $0.layer == 0 }.map(\.id))
+            return off.isEmpty ? all : all.filter { !off.contains($0.id) }
+        }.value
         let excluded = Set(settings.excludedBundleIDs)
         let now = Date()
 
