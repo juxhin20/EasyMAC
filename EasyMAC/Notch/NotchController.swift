@@ -25,11 +25,14 @@ final class NotchModel {
     var awakeIndefinite = true
 }
 
-/// Black shape that grows out of the notch: icon, green level bar, percentage.
+/// The notch grows sideways (same height): icon + label on the left wing, a slim level bar and the
+/// number on the right wing — it reads as part of the notch, nothing hangs below the menu bar.
 struct NotchHUDView: View {
     let model: NotchModel
     let notchWidth: CGFloat
-    let notchHeight: CGFloat
+    let height: CGFloat
+
+    static let wing: CGFloat = 116
 
     private var symbol: String {
         switch model.kind {
@@ -40,40 +43,61 @@ struct NotchHUDView: View {
         }
     }
 
+    private var title: String {
+        switch model.kind {
+        case .brightness: "Brightness"
+        case .volume: model.muted ? "Muted" : "Volume"
+        }
+    }
+
+    private var tint: Color { model.kind == .brightness ? Color(red: 1, green: 0.8, blue: 0.2) : Color(red: 0.3, green: 0.85, blue: 0.45) }
+
     var body: some View {
         let level = model.muted ? 0 : CGFloat(model.level)
-        VStack(spacing: 0) {
-            Color.clear.frame(height: notchHeight)
-            HStack(spacing: 12) {
+        HStack(spacing: 0) {
+            // Left wing
+            HStack(spacing: 7) {
                 Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 24)
+                    .font(.system(size: height * 0.38, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace))
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.green.opacity(0.22))
-                        Capsule().fill(model.kind == .brightness ? Color.yellow : Color.green)
-                            .frame(width: max(proxy.size.width * level, level > 0 ? 6 : 0))
-                    }
-                }
-                .frame(height: 6)
-                Text(model.muted ? "Muted" : "\(Int((model.level * 100).rounded()))%")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .monospacedDigit()
-                    .frame(width: 52, alignment: .trailing)
-                    .contentTransition(.numericText())
+                    .frame(width: height * 0.6)
+                Text(title)
+                    .font(.system(size: height * 0.36, weight: .medium))
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 18)
-            .frame(height: 38)
+            .padding(.leading, height * 0.45)
+            .frame(width: Self.wing)
+
+            Color.clear.frame(width: notchWidth)
+
+            // Right wing
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                ZStack(alignment: .leading) {
+                    Capsule().fill(tint.opacity(0.25))
+                    Capsule().fill(tint).frame(width: max(52 * level, level > 0 ? 4 : 0))
+                }
+                .frame(width: 52, height: 4)
+                Text("\(Int((model.muted ? 0 : model.level * 100).rounded()))")
+                    .font(.system(size: height * 0.38, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .frame(width: 26, alignment: .trailing)
+            }
+            .padding(.trailing, height * 0.45)
+            .frame(width: Self.wing)
         }
-        .frame(width: max(notchWidth + 120, 300))
-        .background(UnevenRoundedRectangle(bottomLeadingRadius: 20, bottomTrailingRadius: 20, style: .continuous).fill(.black))
-        .scaleEffect(x: model.visible ? 1 : 0.6, y: model.visible ? 1 : 0.3, anchor: .top)
-        .opacity(model.visible ? 1 : 0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.78), value: model.visible)
+        .foregroundStyle(.white)
+        .frame(height: height)
+        .background(UnevenRoundedRectangle(bottomLeadingRadius: height * 0.42, bottomTrailingRadius: height * 0.42, style: .continuous).fill(.black))
+        // Opens outward from the notch.
+        .mask(alignment: .center) {
+            Rectangle().frame(width: model.visible ? notchWidth + Self.wing * 2 : notchWidth)
+        }
+        .opacity(model.visible ? 1 : 0.01)
+        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: model.visible)
         .animation(.easeOut(duration: 0.12), value: model.level)
+        .animation(.easeOut(duration: 0.15), value: model.kind)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
@@ -211,7 +235,8 @@ final class NotchController {
 
     private func show(_ kind: NotchModel.Kind, level: Float, muted: Bool) {
         guard let screen = NSScreen.notchScreen ?? NSScreen.withMouse else { return }
-        let notch = screen.notchRect ?? NSRect(x: screen.frame.midX - 90, y: screen.frame.maxY - 32, width: 180, height: 32)
+        let barHeight = max(screen.frame.maxY - screen.visibleFrame.maxY, 24)
+        let notch = screen.notchRect ?? NSRect(x: screen.frame.midX - 40, y: screen.frame.maxY - barHeight, width: 80, height: barHeight)
         let panel = hudPanel ?? makeHUD(screen: screen, notch: notch)
         hudPanel = panel
         model.kind = kind
@@ -233,10 +258,9 @@ final class NotchController {
     private func makeHUD(screen: NSScreen, notch: NSRect) -> FloatingPanel {
         let panel = FloatingPanel(level: .screenSaver, ignoresMouse: true)
         panel.hasShadow = false
-        let width = max(notch.width + 120, 300)
-        let height = notch.height + 38
-        panel.setFrame(NSRect(x: notch.midX - width / 2, y: screen.frame.maxY - height, width: width, height: height), display: false)
-        panel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: notch.width, notchHeight: notch.height))
+        let width = notch.width + NotchHUDView.wing * 2
+        panel.setFrame(NSRect(x: notch.midX - width / 2, y: screen.frame.maxY - notch.height, width: width, height: notch.height), display: false)
+        panel.contentView = NSHostingView(rootView: NotchHUDView(model: model, notchWidth: notch.width, height: notch.height))
         return panel
     }
 
