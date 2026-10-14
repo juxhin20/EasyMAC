@@ -28,6 +28,12 @@
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>EasyMAC uses Accessibility to focus, move and resize your windows.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>EasyMAC lists your Desktop files so you can drag them into other apps.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>EasyMAC lists folders you pin so you can drag files into other apps.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>EasyMAC lists your Downloads so you can drag them into other apps.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 AppAlbania</string>
 	<key>NSPrincipalClass</key>

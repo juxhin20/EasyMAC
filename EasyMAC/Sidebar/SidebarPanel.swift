@@ -15,6 +15,9 @@ struct SidebarMetrics: Equatable {
     var showTitles: Bool
     var showFooter = true
     var spaceCount = 0
+    var fileRowCount = 0
+
+    static let fileRow: CGFloat = 18
 
     static let space: CGFloat = 16
 
@@ -49,8 +52,15 @@ struct SidebarMetrics: Equatable {
         return rows * Self.space + (rows - 1) * Self.chipSpacing + Self.dividerBlock
     }
 
+    /// Tray + pinned folder rows; 0 when hidden.
+    var filesHeight: CGFloat {
+        guard fileRowCount > 0 else { return 0 }
+        let n = CGFloat(fileRowCount)
+        return n * Self.fileRow + (n - 1) * 2 + Self.dividerBlock
+    }
+
     func contentHeight(windowCount: Int, chipCount: Int) -> CGFloat {
-        spacesHeight + Self.headerTop + chipsHeight(chipCount: chipCount) + Self.dividerBlock + cellsHeight(windowCount: windowCount) + (showFooter ? Self.footer : Self.padding)
+        filesHeight + spacesHeight + Self.headerTop + chipsHeight(chipCount: chipCount) + Self.dividerBlock + cellsHeight(windowCount: windowCount) + (showFooter ? Self.footer : Self.padding)
     }
 }
 

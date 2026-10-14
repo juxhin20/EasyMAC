@@ -4,13 +4,14 @@ import Observation
 import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, appearance, snapWheel, layouts, workspaces, hotkeys, excluded, permissions, about
+    case general, appearance, files, snapWheel, layouts, workspaces, hotkeys, excluded, permissions, about
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .general: "General"
         case .appearance: "Sidebar"
+        case .files: "Files & Tray"
         case .snapWheel: "Snap Wheel"
         case .layouts: "Layouts"
         case .workspaces: "Workspaces"
@@ -25,6 +26,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape.fill"
         case .appearance: "sidebar.left"
+        case .files: "folder.fill"
         case .snapWheel: "circle.circle.fill"
         case .layouts: "rectangle.split.2x2.fill"
         case .workspaces: "square.stack.3d.up.fill"
@@ -39,6 +41,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: .gray
         case .appearance: Brand.red
+        case .files: .cyan
         case .snapWheel: .blue
         case .layouts: .teal
         case .workspaces: .purple
@@ -80,6 +83,7 @@ struct SettingsView: View {
                 switch nav.tab {
                 case .general: GeneralSettings(state: state)
                 case .appearance: AppearanceSettings(state: state)
+                case .files: FilesSettings(state: state)
                 case .snapWheel: SnapWheelSettings(state: state)
                 case .layouts: LayoutSettings(state: state)
                 case .workspaces: WorkspaceEditorView(state: state, nav: nav)
@@ -302,6 +306,86 @@ private struct SidebarMiniPreview: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: size)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showTitles)
+    }
+}
+
+// MARK: - Files
+
+private struct FilesSettings: View {
+    let state: AppState
+    @Bindable private var settings = Settings.shared
+    private var shelf: FileShelf { state.files }
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: $settings.showTray) {
+                    Text("Show Tray")
+                    Text("Drop files on it from anywhere to keep them handy. Only the location is saved — nothing is copied.")
+                }
+                Toggle("Show pinned folders", isOn: $settings.showFiles)
+                Picker("Sort files", selection: $settings.shelfSort) {
+                    ForEach(ShelfSort.allCases) { Text($0.title).tag($0) }
+                }
+                Toggle(isOn: $settings.shelfAlwaysOnTop) {
+                    Text("Floating file windows stay on top")
+                    Text("Click ↗ in a file list to float it over all apps.")
+                }
+            } header: {
+                Text("In the strip")
+            }
+
+            Section {
+                ForEach(shelf.folders, id: \.self) { path in
+                    HStack(spacing: 10) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().frame(width: 22, height: 22)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(FileManager.default.displayName(atPath: path))
+                            Text((path as NSString).abbreviatingWithTildeInPath).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            state.shelf.toggleFloat(.folder(path))
+                        } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
+                        .buttonStyle(.borderless)
+                        .help("Open as floating window")
+                        Button {
+                            shelf.removeFolder(path)
+                        } label: { Image(systemName: "minus.circle.fill").foregroundStyle(.secondary) }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                .onMove { shelf.moveFolder(from: $0, to: $1) }
+                Button("Add Folder…") { addFolder() }
+            } header: {
+                Text("Pinned folders")
+            }
+
+            Section {
+                HStack {
+                    Text(shelf.tray.isEmpty ? "The tray is empty." : "\(shelf.tray.count) file\(shelf.tray.count == 1 ? "" : "s") in the tray.")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Open as Floating Window") { state.shelf.toggleFloat(.tray) }
+                    Button("Empty Tray") { shelf.clearTray() }.disabled(shelf.tray.isEmpty)
+                }
+            } header: {
+                Text("Tray")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func addFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Pin Folder"
+        NSApp.activate()
+        if panel.runModal() == .OK {
+            for url in panel.urls { shelf.addFolder(url.path) }
+        }
     }
 }
 

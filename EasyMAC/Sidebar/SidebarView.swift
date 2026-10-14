@@ -8,7 +8,8 @@ struct SidebarView: View {
     private var settings: Settings { state.settings }
     private var metrics: SidebarMetrics {
         SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter,
-                       spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0)
+                       spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0,
+                       fileRowCount: state.visibleShelfSources.count)
     }
     private var accent: Color { Color(nsColor: settings.sidebarAccent.nsColor) }
 
@@ -34,6 +35,9 @@ struct SidebarView: View {
                 .frame(maxWidth: .infinity)
             }
             .frame(maxHeight: .infinity)
+            if metrics.fileRowCount > 0 {
+                filesRows
+            }
             if metrics.spaceCount > 0 {
                 spacesRow
             }
@@ -128,6 +132,19 @@ struct SidebarView: View {
         }
         .contextMenu { WindowContextMenu(state: state, window: window) }
         .transition(.asymmetric(insertion: .scale(scale: 0.8).combined(with: .opacity), removal: .opacity))
+    }
+
+    /// Tray + pinned folders. Click opens the file list beside the strip; drop files on Tray to keep them.
+    private var filesRows: some View {
+        VStack(spacing: 2) {
+            Capsule()
+                .fill(Color.primary.opacity(0.12))
+                .frame(width: metrics.thumbWidth * 0.6, height: 1)
+                .frame(height: SidebarMetrics.dividerBlock)
+            ForEach(state.visibleShelfSources) { source in
+                ShelfRow(source: source, state: state, accent: accent, width: metrics.thumbWidth)
+            }
+        }
     }
 
     /// Small numbered desktops; the current one is filled with the accent. Click to switch.

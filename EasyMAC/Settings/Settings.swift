@@ -161,6 +161,10 @@ final class Settings {
     var showThumbnails: Bool { didSet { store(showThumbnails, "showThumbnails") } }
     var showFooter: Bool { didSet { store(showFooter, "showFooter") } }
     var showSpaces: Bool { didSet { store(showSpaces, "showSpaces") } }
+    var showFiles: Bool { didSet { store(showFiles, "showFiles") } }
+    var showTray: Bool { didSet { store(showTray, "showTray") } }
+    var shelfSort: ShelfSort { didSet { store(shelfSort.rawValue, "shelfSort") } }
+    var shelfAlwaysOnTop: Bool { didSet { store(shelfAlwaysOnTop, "shelfAlwaysOnTop") } }
 
     // Layouts
     var layoutGap: Double { didSet { store(layoutGap, "layoutGap") } }
@@ -222,6 +226,10 @@ final class Settings {
         showThumbnails = bool("showThumbnails", true)
         showFooter = bool("showFooter", true)
         showSpaces = bool("showSpaces", false)
+        showFiles = bool("showFiles", true)
+        showTray = bool("showTray", true)
+        shelfSort = choice("shelfSort", ShelfSort.newest)
+        shelfAlwaysOnTop = bool("shelfAlwaysOnTop", true)
 
         layoutGap = double("layoutGap", 8)
         quickTilePreset = choice("quickTilePreset", LayoutPreset.halves)

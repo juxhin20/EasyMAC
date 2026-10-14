@@ -68,6 +68,7 @@ final class SidebarController {
     // MARK: - Public control
 
     var screen: NSScreen? { currentScreen }
+    var frame: NSRect { panel.frame }
 
     /// Width the pinned strip occupies on its edge (0 when hidden or auto-hiding).
     var reservedWidth: CGFloat {
@@ -209,7 +210,8 @@ final class SidebarController {
 
     private var metrics: SidebarMetrics {
         SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter,
-                       spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0)
+                       spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0,
+                       fileRowCount: state.visibleShelfSources.count)
     }
 
     private var displayedWindows: [WindowInfo] {
@@ -272,6 +274,8 @@ final class SidebarController {
             _ = state.workspaces.workspaces
             _ = state.spaces.spaces
             _ = state.spaces.currentID
+            _ = state.files.folders
+            _ = state.files.tray.isEmpty
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -337,7 +341,7 @@ final class SidebarController {
         var keepZone = panel.frame.insetBy(dx: -24, dy: -24)
         if preview.isVisible { keepZone = keepZone.union(panel.frame.insetBy(dx: -520, dy: 0)) }
         if keepZone.contains(mouse) { mouseEnteredSinceReveal = true }
-        let keep = keepZone.contains(mouse) || menuOpen || model.isDragging || (hotkeyRevealed && !mouseEnteredSinceReveal)
+        let keep = keepZone.contains(mouse) || menuOpen || model.isDragging || state.shelf.isPopoverOpen || (hotkeyRevealed && !mouseEnteredSinceReveal)
         if keep {
             concealTask?.cancel()
             concealTask = nil

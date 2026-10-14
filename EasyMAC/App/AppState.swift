@@ -16,11 +16,13 @@ final class AppState {
     let toast = ToastController()
     let updater = Updater()
     let spaces = SpacesService()
+    let files = FileShelf()
 
     lazy var sidebar = SidebarController(state: self)
     lazy var snap = SnapController(state: self)
     lazy var radial = RadialSnapController(state: self)
     lazy var switcher = SwitcherController(state: self)
+    lazy var shelf = FileShelfController(state: self)
     lazy var settingsWindow = SettingsWindowController(state: self)
     lazy var onboarding = OnboardingWindowController(state: self)
     private lazy var restorer = WorkspaceRestorer(area: { [unowned self] in self.usableAreaAX($0) })
@@ -45,6 +47,7 @@ final class AppState {
         sidebar.start()
         spaces.screenProvider = { [weak self] in self?.sidebar.screen }
         spaces.start()
+        shelf.restoreFloating()
         radial.start()
 
         permissions.onChange = { [weak self] accessibility, _ in
@@ -89,6 +92,7 @@ final class AppState {
         default:
             windows.settingsChanged()
             sidebar.settingsChanged()
+            shelf.settingsChanged()
         }
     }
 
@@ -144,6 +148,19 @@ final class AppState {
 
     func quitApp(_ window: WindowInfo) {
         NSRunningApplication(processIdentifier: window.pid)?.terminate()
+    }
+
+    /// Sources shown as rows in the strip (Tray first, then pinned folders).
+    var visibleShelfSources: [ShelfSource] {
+        var list: [ShelfSource] = []
+        if settings.showTray { list.append(.tray) }
+        if settings.showFiles { list += files.folders.map { .folder($0) } }
+        return list
+    }
+
+    func toggleShelf(_ source: ShelfSource) {
+        guard let screen = sidebar.screen ?? NSScreen.main else { return }
+        shelf.toggle(source, anchorY: NSEvent.mouseLocation.y, stripFrame: sidebar.frame, edge: settings.sidebarEdge, screen: screen)
     }
 
     func toggleSidebar() {

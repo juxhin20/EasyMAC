@@ -48,6 +48,9 @@ targets:
         NSHumanReadableCopyright: "© 2026 AppAlbania"
         NSAccessibilityUsageDescription: "EasyMAC uses Accessibility to focus, move and resize your windows."
         NSScreenCaptureUsageDescription: "EasyMAC uses Screen Recording to show live thumbnails of your windows."
+        NSDesktopFolderUsageDescription: "EasyMAC lists your Desktop files so you can drag them into other apps."
+        NSDownloadsFolderUsageDescription: "EasyMAC lists your Downloads so you can drag them into other apps."
+        NSDocumentsFolderUsageDescription: "EasyMAC lists folders you pin so you can drag files into other apps."
         NSPrincipalClass: NSApplication
         SUFeedURL: https://appalbania.com/easymac/appcast.xml
         SUPublicEDKey: FAn0gT9H9/c4h43pe5BCNNfwHFD0XUpUv+UvDlMOvHw=
