@@ -19,6 +19,7 @@ final class AppState {
     let files = FileShelf()
     let awake = AwakeController()
     let clipboard = ClipboardHistory()
+    let nowPlaying = NowPlaying()
 
     lazy var sidebar = SidebarController(state: self)
     lazy var snap = SnapController(state: self)
@@ -57,6 +58,7 @@ final class AppState {
         clipboard.setEnabled(settings.clipboardEnabled)
         clipboardPanel.updateStatusItem()
         shelf.updateStatusItem()
+        if settings.notchNowPlaying { nowPlaying.start() }
         notch.start()
         mouse.update()
         if UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["previewNotchHUD"] != nil {
@@ -110,6 +112,7 @@ final class AppState {
             clipboard.setEnabled(settings.clipboardEnabled)
         clipboardPanel.updateStatusItem()
         shelf.updateStatusItem()
+        if settings.notchNowPlaying { nowPlaying.start() }
         notch.start()
         mouse.update()
         if UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["previewNotchHUD"] != nil {
@@ -129,6 +132,8 @@ final class AppState {
             break
         case "reverseMouseScroll", "reverseMouseHorizontal":
             mouse.update()
+        case "notchNowPlaying":
+            if settings.notchNowPlaying { nowPlaying.start() } else { nowPlaying.stop() }
         case "notchHUD":
             notch.updateTap()
         case "showAwakeIcon":

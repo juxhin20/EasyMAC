@@ -147,6 +147,12 @@ final class NotchController {
     private var hudPanel: NotchPanel?
     private var pillPanel: NotchPanel?
     private var hideTask: Task<Void, Never>?
+    private var musicPanel: NotchPanel?
+    private var musicHost: TrackingHostingView?
+    private var musicExpanded = false
+    private var collapseTask: Task<Void, Never>?
+    private var pausedSince: Date?
+    private var musicHideTask: Task<Void, Never>?
     private var pillTimer: Timer?
     nonisolated(unsafe) private var tap: CFMachPort?
     nonisolated(unsafe) private var runLoopSource: CFRunLoopSource?
@@ -161,12 +167,16 @@ final class NotchController {
     func start() {
         updateTap()
         observeAwake()
+        observeMusic()
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.hudPanel = nil
                 self?.pillPanel?.orderOut(nil)
                 self?.pillPanel = nil
+                self?.musicPanel?.orderOut(nil)
+                self?.musicPanel = nil
                 self?.updatePill()
+                self?.updateMusic()
             }
         }
     }
@@ -275,6 +285,105 @@ final class NotchController {
         return panel
     }
 
+    // MARK: - Now playing
+
+    private var musicVisible: Bool { musicPanel?.isVisible == true }
+
+    private func observeMusic() {
+        withObservationTracking {
+            _ = state.nowPlaying.title
+            _ = state.nowPlaying.isPlaying
+            _ = state.nowPlaying.artwork
+            _ = state.settings.notchNowPlaying
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.updateMusic()
+                self?.observeMusic()
+            }
+        }
+        updateMusic()
+    }
+
+    /// Shown while something plays; after a pause it stays 8 s (or while hovered), then tucks away.
+    private func updateMusic() {
+        let player = state.nowPlaying
+        guard state.settings.notchNowPlaying, player.hasTrack, let screen = NSScreen.notchScreen, let notch = screen.notchRect else {
+            hideMusic()
+            return
+        }
+        musicHideTask?.cancel()
+        if !player.isPlaying {
+            if pausedSince == nil { pausedSince = Date() }
+            musicHideTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(8))
+                guard !Task.isCancelled, let self, !self.musicExpanded, !self.state.nowPlaying.isPlaying else { return }
+                self.hideMusic()
+            }
+        } else {
+            pausedSince = nil
+        }
+        let panel = musicPanel ?? makeMusicPanel(notch: notch)
+        musicPanel = panel
+        layoutMusic(notch: notch, screen: screen, animated: false)
+        if !panel.isVisible { panel.orderFrontRegardless() }
+        updatePill()
+    }
+
+    private func hideMusic() {
+        musicExpanded = false
+        musicPanel?.orderOut(nil)
+        updatePill()
+    }
+
+    private func makeMusicPanel(notch: NSRect) -> NotchPanel {
+        let panel = NotchPanel(level: .statusBar, ignoresMouse: false)
+        panel.hasShadow = false
+        let host = TrackingHostingView(rootView: AnyView(EmptyView()))
+        host.onMouse = { [weak self] point in self?.musicHover(point != nil) }
+        panel.contentView = host
+        musicHost = host
+        return panel
+    }
+
+    private func layoutMusic(notch: NSRect, screen: NSScreen, animated: Bool) {
+        guard let panel = musicPanel else { return }
+        musicHost?.rootView = AnyView(NowPlayingNotchView(player: state.nowPlaying, expanded: musicExpanded,
+                                                          notchWidth: notch.width, height: notch.height))
+        let wing = musicExpanded ? NowPlayingNotchView.expandedWing : NowPlayingNotchView.wing
+        let width = notch.width + wing * 2
+        let height = notch.height + (musicExpanded ? NowPlayingNotchView.expandedExtra : 0)
+        let frame = NSRect(x: notch.midX - width / 2, y: screen.frame.maxY - height, width: width, height: height)
+        // Grow before animating open; shrink after the content has closed (keeps clicks outside free).
+        if musicExpanded || !animated {
+            panel.setFrame(frame, display: true)
+        } else {
+            Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard let self, !self.musicExpanded else { return }
+                panel.setFrame(frame, display: true)
+            }
+        }
+    }
+
+    private func musicHover(_ inside: Bool) {
+        guard let screen = NSScreen.notchScreen, let notch = screen.notchRect else { return }
+        collapseTask?.cancel()
+        if inside {
+            guard !musicExpanded else { return }
+            musicExpanded = true
+            musicHideTask?.cancel()
+            layoutMusic(notch: notch, screen: screen, animated: true)
+        } else {
+            collapseTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(350))
+                guard !Task.isCancelled, let self else { return }
+                self.musicExpanded = false
+                self.layoutMusic(notch: notch, screen: screen, animated: true)
+                self.updateMusic()
+            }
+        }
+    }
+
     // MARK: - Keep Awake pill
 
     private func observeAwake() {
@@ -305,12 +414,14 @@ final class NotchController {
             let p = NotchPanel(level: .screenSaver, ignoresMouse: true)
             p.hasShadow = false
             let width = notch.height + 22
-            // Tucks 10 pt under the notch so the black shapes read as one piece.
             p.setFrame(NSRect(x: notch.maxX - 10, y: notch.minY, width: width, height: notch.height), display: false)
             p.contentView = NSHostingView(rootView: AwakePillView(model: model, height: notch.height))
             return p
         }()
         pillPanel = panel
+        // Sits right after the now-playing wing when music shows, else tucked 10 pt under the notch.
+        let offset = musicVisible && !musicExpanded ? NowPlayingNotchView.wing : 0
+        panel.setFrameOrigin(NSPoint(x: notch.maxX - 10 + offset, y: notch.minY))
         panel.orderFrontRegardless()
         refreshProgress(total: total)
         pillTimer?.invalidate()

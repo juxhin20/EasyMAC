@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>EasyMAC uses Accessibility to focus, move and resize your windows.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>EasyMAC reads the current Spotify track to show it in the notch.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>EasyMAC lists your Desktop files so you can drag them into other apps.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

@@ -185,6 +185,10 @@ private struct GeneralSettings: View {
                     Text("Volume & brightness in the notch")
                     Text("Volume, mute and brightness keys show a sleek bar under the notch instead of the system popup.")
                 }
+                Toggle(isOn: $settings.notchNowPlaying) {
+                    Text("Now playing in the notch")
+                    Text("Album art and live bars while Spotify or Apple Music plays; hover for title and controls.")
+                }
                 Toggle(isOn: $settings.notchAwakeIndicator) {
                     Text("Keep Awake indicator next to the notch")
                     Text("A small cup with a ring that shows the time left.")
