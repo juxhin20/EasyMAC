@@ -141,8 +141,59 @@ final class AwakeController: NSObject, NSMenuDelegate {
 
     // MARK: - Lid closed (pmset)
 
-    /// Runs `pmset -a disablesleep 0/1` with the standard macOS admin prompt.
+    // MARK: - One-time permission for Lid closed
+
+    static let sudoersPath = "/etc/sudoers.d/easymac-lid"
+
+    /// True when the one-time rule is installed (Lid closed then works without a password).
+    static var lidPermissionInstalled: Bool {
+        FileManager.default.fileExists(atPath: sudoersPath)
+    }
+
+    /// Installs a sudoers rule allowing exactly `pmset -a disablesleep 0` and `… 1` for this user,
+    /// validated with `visudo -c` before it is put in place. Asks for the admin password once.
+    @discardableResult
+    static func installLidPermission() -> Bool {
+        let user = NSUserName().replacingOccurrences(of: "[^A-Za-z0-9._-]", with: "", options: .regularExpression)
+        guard !user.isEmpty else { return false }
+        let rule = "\(user) ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1"
+        let shell = [
+            "tmp=$(/usr/bin/mktemp)",
+            "/bin/echo '\(rule)' > \"$tmp\"",
+            "/usr/sbin/visudo -cf \"$tmp\"",
+            "/usr/sbin/chown root:wheel \"$tmp\"",
+            "/bin/chmod 0440 \"$tmp\"",
+            "/bin/mv \"$tmp\" \(sudoersPath)",
+        ].joined(separator: " && ")
+        return runAsAdmin(shell)
+    }
+
+    @discardableResult
+    static func removeLidPermission() -> Bool {
+        runAsAdmin("/bin/rm -f \(sudoersPath)")
+    }
+
+    private static func runAsAdmin(_ shell: String) -> Bool {
+        let escaped = shell.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        var error: NSDictionary?
+        NSApp.activate()
+        NSAppleScript(source: "do shell script \"\(escaped)\" with administrator privileges")?.executeAndReturnError(&error)
+        if let error { Log.app.notice("Admin command failed: \(String(describing: error), privacy: .public)") }
+        return error == nil
+    }
+
+    /// Runs `pmset -a disablesleep 0/1`: silently via the one-time rule when installed, otherwise
+    /// with the standard macOS admin prompt.
     private static func setLidSleepDisabled(_ disabled: Bool) -> Bool {
+        if lidPermissionInstalled {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+            task.arguments = ["-n", "/usr/bin/pmset", "-a", "disablesleep", disabled ? "1" : "0"]
+            if (try? task.run()) != nil {
+                task.waitUntilExit()
+                if task.terminationStatus == 0 { return true }
+            }
+        }
         let script = "do shell script \"/usr/bin/pmset -a disablesleep \(disabled ? 1 : 0)\" with administrator privileges"
         var error: NSDictionary?
         NSApp.activate()

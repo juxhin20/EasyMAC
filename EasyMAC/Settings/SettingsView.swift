@@ -203,8 +203,9 @@ private struct GeneralSettings: View {
                         Label(mode.title, systemImage: mode.symbol).tag(mode)
                     }
                 }
-                Text(settings.awakeMode.detail + (settings.awakeMode == .lidClosed ? " — asks for your password when switched on and off." : "."))
+                Text(settings.awakeMode.detail + ".")
                     .font(.caption).foregroundStyle(.secondary)
+                LidPermissionRow()
                 HStack {
                     Text(state.awake.isActive ? "Keeping your Mac awake" : "Off — your Mac can sleep")
                         .foregroundStyle(state.awake.isActive ? Color.primary : Color.secondary)
@@ -234,6 +235,37 @@ private struct GeneralSettings: View {
         }
         .formStyle(.grouped)
         .onAppear { login.refresh() }
+    }
+}
+
+/// One-time permission so "Lid closed" never asks for the password again.
+private struct LidPermissionRow: View {
+    @State private var installed = AwakeController.lidPermissionInstalled
+
+    var body: some View {
+        HStack(alignment: .top) {
+            Image(systemName: installed ? "checkmark.shield.fill" : "lock.shield")
+                .foregroundStyle(installed ? .green : .orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(installed ? "Lid closed works without a password" : "Lid closed asks for your password each time")
+                Text(installed
+                     ? "EasyMAC may run only “pmset disablesleep 0/1”. Remove any time."
+                     : "Allow once: EasyMAC gets permission for exactly “pmset disablesleep 0/1”, nothing else.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if installed {
+                Button("Remove") {
+                    AwakeController.removeLidPermission()
+                    installed = AwakeController.lidPermissionInstalled
+                }
+            } else {
+                Button("Allow Once…") {
+                    AwakeController.installLidPermission()
+                    installed = AwakeController.lidPermissionInstalled
+                }
+            }
+        }
     }
 }
 
@@ -801,6 +833,13 @@ private struct PermissionSettings: View {
                 row("Screen Recording", "Live thumbnails and window titles.", permissions.screenRecordingGranted) {
                     permissions.requestScreenRecording()
                 }
+            } header: {
+                Text("Required")
+            }
+            Section {
+                LidPermissionRow()
+            } header: {
+                Text("Optional — Keep Awake “Lid closed”")
             }
             Section {
                 HStack {
