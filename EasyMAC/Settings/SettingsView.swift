@@ -91,7 +91,7 @@ struct SettingsView: View {
             }
             .navigationTitle(nav.tab.title)
         }
-        .frame(minWidth: 860, minHeight: 560)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -150,6 +150,20 @@ private struct GeneralSettings: View {
             }
 
             Section {
+                Toggle("Check for updates automatically", isOn: Binding(get: { state.updater.automaticallyChecks }, set: { state.updater.automaticallyChecks = $0 }))
+                Toggle("Download and install updates automatically", isOn: Binding(get: { state.updater.automaticallyDownloads }, set: { state.updater.automaticallyDownloads = $0 }))
+                    .disabled(!state.updater.automaticallyChecks)
+                HStack {
+                    Text(state.updater.lastCheck.map { "Last checked \($0.formatted(.relative(presentation: .named)))" } ?? "Never checked")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Check Now") { state.updater.checkForUpdates() }
+                }
+            } header: {
+                Text("Updates")
+            }
+
+            Section {
                 Toggle("Hide other apps when restoring a workspace", isOn: $settings.hideOthersOnRestore)
             } header: {
                 Text("Workspaces")
@@ -177,6 +191,11 @@ private struct AppearanceSettings: View {
     let state: AppState
     @Bindable private var settings = Settings.shared
 
+    static let intervals: [(Double, String)] = [
+        (1, "1 second"), (3, "3 seconds"), (5, "5 seconds"), (10, "10 seconds"), (30, "30 seconds"),
+        (60, "1 minute"), (300, "5 minutes"), (600, "10 minutes"),
+    ]
+
     var body: some View {
         Form {
             Section {
@@ -194,6 +213,7 @@ private struct AppearanceSettings: View {
                             ForEach(AccentChoice.allCases) { Text($0.title).tag($0) }
                         }
                         Toggle("Show titles under thumbnails", isOn: $settings.showTitles)
+                        Toggle("Show “EasyMAC ⚙” footer", isOn: $settings.showFooter)
                     }
                 }
             } header: {
@@ -205,12 +225,11 @@ private struct AppearanceSettings: View {
                 LabeledContent("Maximum windows shown") {
                     Stepper("\(settings.maxVisible)", value: $settings.maxVisible, in: 3...25)
                 }
-                VStack(alignment: .leading) {
-                    Slider(value: $settings.refreshInterval, in: 1...10, step: 1) {
-                        Text("Refresh thumbnails every")
-                    } minimumValueLabel: { Text("1s") } maximumValueLabel: { Text("10s") }
-                    Text("Every \(Int(settings.refreshInterval))s — lower is livelier, higher saves battery.")
-                        .font(.caption).foregroundStyle(.secondary)
+                Picker(selection: $settings.refreshInterval) {
+                    ForEach(Self.intervals, id: \.0) { Text($0.1).tag($0.0) }
+                } label: {
+                    Text("Refresh thumbnails every")
+                    Text("Thumbnails also update instantly when you switch to or resize a window. Background windows refresh 4× slower; on battery everything is 2× slower.")
                 }
                 Picker("Order", selection: $settings.ordering) {
                     ForEach(WindowOrdering.allCases) { Text($0.title).tag($0) }

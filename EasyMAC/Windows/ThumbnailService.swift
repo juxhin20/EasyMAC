@@ -1,4 +1,5 @@
 import AppKit
+import IOKit.ps
 import Observation
 @preconcurrency import ScreenCaptureKit
 
@@ -21,6 +22,10 @@ final class ThumbnailService {
 
     @ObservationIgnored private let settings = Settings.shared
     @ObservationIgnored private var stamps: [CGWindowID: Date] = [:]
+    /// State at last capture: a change of size or focus means the thumbnail is stale right now.
+    @ObservationIgnored private var captured: [CGWindowID: (size: CGSize, active: Bool)] = [:]
+    @ObservationIgnored private var displaysAsleep = false
+    @ObservationIgnored private var sleepObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var content: SCShareableContent?
     @ObservationIgnored private var contentStamp = Date.distantPast
     @ObservationIgnored private var contentLoading = false
@@ -47,6 +52,30 @@ final class ThumbnailService {
 
     // MARK: - Control
 
+    /// Pause while displays sleep or the screen is locked (nothing to look at).
+    func observeSleep() {
+        let center = NSWorkspace.shared.notificationCenter
+        let pairs: [(Notification.Name, Bool)] = [
+            (NSWorkspace.screensDidSleepNotification, true), (NSWorkspace.screensDidWakeNotification, false),
+            (NSWorkspace.sessionDidResignActiveNotification, true), (NSWorkspace.sessionDidBecomeActiveNotification, false),
+        ]
+        for (name, asleep) in pairs {
+            sleepObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.displaysAsleep = asleep
+                    if !asleep { self?.tick(maxAge: 0.5) }
+                }
+            })
+        }
+    }
+
+    /// Battery or Low Power Mode doubles every interval.
+    private var powerFactor: Double {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled { return 2 }
+        let source = IOPSGetProvidingPowerSourceType(nil)?.takeRetainedValue() as String?
+        return source == kIOPSBatteryPowerValue ? 2 : 1
+    }
+
     func setActive(_ active: Bool) {
         guard active != isActive else { return }
         isActive = active
@@ -63,7 +92,7 @@ final class ThumbnailService {
     func restartTimer() {
         timer?.invalidate()
         guard isActive else { return }
-        let interval = min(max(settings.refreshInterval, 1), 10)
+        let interval = min(max(settings.refreshInterval, 1), 600)
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
@@ -81,9 +110,10 @@ final class ThumbnailService {
         if boxes.keys.contains(where: { !alive.contains($0) }) {
             boxes = boxes.filter { alive.contains($0.key) }
             stamps = stamps.filter { alive.contains($0.key) }
+            captured = captured.filter { alive.contains($0.key) }
         }
-        guard isActive else { return }
-        for window in windows where image(window.windowID) == nil && !window.isOffscreen {
+        guard isActive, !displaysAsleep else { return }
+        for window in windows where !window.isOffscreen && (image(window.windowID) == nil || changedSinceCapture(window)) {
             enqueue(window, hover: false)
         }
     }
@@ -120,14 +150,23 @@ final class ThumbnailService {
 
     // MARK: - Work
 
+    /// The active window refreshes every `refreshInterval`; background windows (which rarely change)
+    /// 4× slower; any window that was resized or (de)activated is captured right away.
     private func tick(maxAge: TimeInterval? = nil) {
-        guard isActive, settings.showThumbnails, canCapture() else { return }
-        let age = maxAge ?? max(settings.refreshInterval - 0.25, 0.75)
+        guard isActive, !displaysAsleep, settings.showThumbnails, canCapture() else { return }
+        let base = max(settings.refreshInterval - 0.25, 0.75) * powerFactor
         let now = Date()
         for window in visible where !window.isOffscreen {
-            if let stamp = stamps[window.windowID], now.timeIntervalSince(stamp) < age { continue }
+            let age = maxAge ?? (window.isActive ? base : base * 4)
+            if let stamp = stamps[window.windowID], now.timeIntervalSince(stamp) < age, !changedSinceCapture(window) { continue }
             enqueue(window, hover: false)
         }
+    }
+
+    private func changedSinceCapture(_ window: WindowInfo) -> Bool {
+        guard let last = captured[window.windowID] else { return false }
+        return last.active != window.isActive
+            || abs(last.size.width - window.frame.width) > 2 || abs(last.size.height - window.frame.height) > 2
     }
 
     private func enqueue(_ window: WindowInfo, hover: Bool) {
@@ -153,6 +192,8 @@ final class ThumbnailService {
             } else {
                 box(window.windowID).image = nsImage
                 stamps[window.windowID] = Date()
+                let current = visible.first { $0.windowID == window.windowID } ?? window
+                captured[window.windowID] = (current.frame.size, current.isActive)
             }
         }
     }

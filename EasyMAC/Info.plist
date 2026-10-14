@@ -34,5 +34,13 @@
 	<string>NSApplication</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>EasyMAC uses Screen Recording to show live thumbnails of your windows.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://appalbania.com/easymac/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>FAn0gT9H9/c4h43pe5BCNNfwHFD0XUpUv+UvDlMOvHw=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

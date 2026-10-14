@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 TEAM_ID="${TEAM_ID:-89K4SJGXLP}"
-: "${NOTARY_PROFILE:?Set NOTARY_PROFILE to a notarytool keychain profile name}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-EasyMAC-notary}"   # created with the team API key 9NRXWCW938
 
 if ! security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
   echo "error: no 'Developer ID Application' certificate in the keychain." >&2

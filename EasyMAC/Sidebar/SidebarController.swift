@@ -188,7 +188,7 @@ final class SidebarController {
     // MARK: - Layout
 
     private var metrics: SidebarMetrics {
-        SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles)
+        SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter)
     }
 
     private var displayedWindows: [WindowInfo] {
@@ -282,7 +282,7 @@ final class SidebarController {
 
     private func mouseMoved() {
         let now = Date()
-        guard now.timeIntervalSince(lastMouseEvent) > 1.0 / 60 else { return }
+        guard now.timeIntervalSince(lastMouseEvent) > 1.0 / 30 else { return }
         lastMouseEvent = now
         let mouse = NSEvent.mouseLocation
 

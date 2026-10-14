@@ -19,6 +19,8 @@ final class RadialSnapController {
     private var settings: Settings { state.settings }
     private var phase = Phase.idle
     private var monitors: [Any] = []
+    /// Mouse monitors exist only while the trigger is held: no per-mouse-move cost the rest of the time.
+    private var mouseMonitors: [Any] = []
     private var armTask: Task<Void, Never>?
     private var targetTask: Task<SnapController.Target?, Never>?
     private var lastScreen: NSScreen?
@@ -52,13 +54,6 @@ final class RadialSnapController {
             MainActor.assumeIsolated { self?.flagsChanged(event) }
             return event
         }) { monitors.append(m) }
-        if let m = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged], handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.mouseMoved() }
-        }) { monitors.append(m) }
-        if let m = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged], handler: { [weak self] event in
-            MainActor.assumeIsolated { self?.mouseMoved() }
-            return event
-        }) { monitors.append(m) }
         if let m = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
             MainActor.assumeIsolated { self?.keyDown(event) }
         }) { monitors.append(m) }
@@ -73,6 +68,23 @@ final class RadialSnapController {
         for monitor in monitors { NSEvent.removeMonitor(monitor) }
         monitors.removeAll()
         cancel()
+    }
+
+    private func startTrackingMouse() {
+        guard mouseMonitors.isEmpty else { return }
+        let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
+        if let m = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.mouseMoved() }
+        }) { mouseMonitors.append(m) }
+        if let m = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.mouseMoved() }
+            return event
+        }) { mouseMonitors.append(m) }
+    }
+
+    private func stopTrackingMouse() {
+        for monitor in mouseMonitors { NSEvent.removeMonitor(monitor) }
+        mouseMonitors.removeAll()
     }
 
     // MARK: - Events
@@ -91,6 +103,7 @@ final class RadialSnapController {
         case (.idle, true):
             let origin = NSEvent.mouseLocation
             phase = .armed(origin: origin)
+            startTrackingMouse()
             armTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(self?.settings.radialHoldDelay ?? 0.15))
                 guard !Task.isCancelled, let self, case .armed = self.phase else { return }
@@ -243,6 +256,7 @@ final class RadialSnapController {
         let targetTask = targetTask
         let screen = lastScreen ?? NSScreen.withMouse
         phase = .idle
+        stopTrackingMouse()
         hideRing()
         hidePreview()
         guard let action else { return }
@@ -261,6 +275,7 @@ final class RadialSnapController {
             hidePreview()
         }
         phase = .idle
+        stopTrackingMouse()
         targetTask = nil
         lastScreen = nil
     }

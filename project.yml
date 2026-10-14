@@ -10,6 +10,9 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: 3.0.0
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.0
 
 settings:
   base:
@@ -31,6 +34,7 @@ targets:
       - path: EasyMAC
     dependencies:
       - package: KeyboardShortcuts
+      - package: Sparkle
     info:
       path: EasyMAC/Info.plist
       properties:
@@ -45,6 +49,10 @@ targets:
         NSAccessibilityUsageDescription: "EasyMAC uses Accessibility to focus, move and resize your windows."
         NSScreenCaptureUsageDescription: "EasyMAC uses Screen Recording to show live thumbnails of your windows."
         NSPrincipalClass: NSApplication
+        SUFeedURL: https://appalbania.com/easymac/appcast.xml
+        SUPublicEDKey: FAn0gT9H9/c4h43pe5BCNNfwHFD0XUpUv+UvDlMOvHw=
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
     entitlements:
       path: EasyMAC/EasyMAC.entitlements
       properties:

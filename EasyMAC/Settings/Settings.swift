@@ -158,6 +158,7 @@ final class Settings {
     var panelStyle: PanelStyle { didSet { store(panelStyle.rawValue, "panelStyle") } }
     var sidebarAccent: AccentChoice { didSet { store(sidebarAccent.rawValue, "sidebarAccent") } }
     var showThumbnails: Bool { didSet { store(showThumbnails, "showThumbnails") } }
+    var showFooter: Bool { didSet { store(showFooter, "showFooter") } }
 
     // Layouts
     var layoutGap: Double { didSet { store(layoutGap, "layoutGap") } }
@@ -216,6 +217,7 @@ final class Settings {
         panelStyle = choice("panelStyle", PanelStyle.glass)
         sidebarAccent = choice("sidebarAccent", AccentChoice.appAlbania)
         showThumbnails = bool("showThumbnails", true)
+        showFooter = bool("showFooter", true)
 
         layoutGap = double("layoutGap", 8)
         quickTilePreset = choice("quickTilePreset", LayoutPreset.halves)

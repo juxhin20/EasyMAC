@@ -14,6 +14,7 @@ final class AppState {
     let thumbnails = ThumbnailService()
     let workspaces = WorkspaceManager()
     let toast = ToastController()
+    let updater = Updater()
 
     lazy var sidebar = SidebarController(state: self)
     lazy var snap = SnapController(state: self)
@@ -38,6 +39,7 @@ final class AppState {
         launchAtLogin.enableOnFirstRun()
 
         windows.startObserving()
+        thumbnails.observeSleep()
         HotkeyController.register(self)
         sidebar.start()
         radial.start()

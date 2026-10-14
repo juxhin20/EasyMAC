@@ -13,6 +13,7 @@ final class SidebarPanel: FloatingPanel {
 struct SidebarMetrics: Equatable {
     var thumbWidth: CGFloat
     var showTitles: Bool
+    var showFooter = true
 
     static let padding: CGFloat = 8
     static let spacing: CGFloat = 8
@@ -39,7 +40,7 @@ struct SidebarMetrics: Equatable {
     }
 
     func contentHeight(windowCount: Int, chipCount: Int) -> CGFloat {
-        Self.headerTop + chipsHeight(chipCount: chipCount) + Self.dividerBlock + cellsHeight(windowCount: windowCount) + Self.footer
+        Self.headerTop + chipsHeight(chipCount: chipCount) + Self.dividerBlock + cellsHeight(windowCount: windowCount) + (showFooter ? Self.footer : Self.padding)
     }
 }
 

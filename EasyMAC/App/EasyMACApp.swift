@@ -56,6 +56,7 @@ struct MenuBarMenu: View {
         }
         Button("Settings…") { state.openSettings() }
             .keyboardShortcut(",")
+        Button("Check for Updates…") { state.updater.checkForUpdates() }
         Button("About EasyMAC") { state.openSettings(.about) }
 
         Divider()

@@ -7,7 +7,7 @@ struct SidebarView: View {
 
     private var settings: Settings { state.settings }
     private var metrics: SidebarMetrics {
-        SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles)
+        SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter)
     }
     private var accent: Color { Color(nsColor: settings.sidebarAccent.nsColor) }
 
@@ -33,7 +33,11 @@ struct SidebarView: View {
                 .frame(maxWidth: .infinity)
             }
             .frame(maxHeight: .infinity)
-            footer
+            if settings.showFooter {
+                footer
+            } else {
+                Color.clear.frame(height: SidebarMetrics.padding)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay {
