@@ -14,6 +14,9 @@ struct SidebarMetrics: Equatable {
     var thumbWidth: CGFloat
     var showTitles: Bool
     var showFooter = true
+    var spaceCount = 0
+
+    static let space: CGFloat = 16
 
     static let padding: CGFloat = 8
     static let spacing: CGFloat = 8
@@ -39,8 +42,15 @@ struct SidebarMetrics: Equatable {
         return n * cellHeight + (n - 1) * Self.spacing + Self.spacing // scroll content padding
     }
 
+    /// Desktop switcher row(s) above the footer; 0 when hidden.
+    var spacesHeight: CGFloat {
+        guard spaceCount > 0 else { return 0 }
+        let rows = CGFloat((spaceCount + chipsPerRow - 1) / chipsPerRow)
+        return rows * Self.space + (rows - 1) * Self.chipSpacing + Self.dividerBlock
+    }
+
     func contentHeight(windowCount: Int, chipCount: Int) -> CGFloat {
-        Self.headerTop + chipsHeight(chipCount: chipCount) + Self.dividerBlock + cellsHeight(windowCount: windowCount) + (showFooter ? Self.footer : Self.padding)
+        spacesHeight + Self.headerTop + chipsHeight(chipCount: chipCount) + Self.dividerBlock + cellsHeight(windowCount: windowCount) + (showFooter ? Self.footer : Self.padding)
     }
 }
 

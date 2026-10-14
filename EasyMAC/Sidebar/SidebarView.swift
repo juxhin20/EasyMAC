@@ -7,7 +7,8 @@ struct SidebarView: View {
 
     private var settings: Settings { state.settings }
     private var metrics: SidebarMetrics {
-        SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter)
+        SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter,
+                       spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0)
     }
     private var accent: Color { Color(nsColor: settings.sidebarAccent.nsColor) }
 
@@ -33,6 +34,9 @@ struct SidebarView: View {
                 .frame(maxWidth: .infinity)
             }
             .frame(maxHeight: .infinity)
+            if metrics.spaceCount > 0 {
+                spacesRow
+            }
             if settings.showFooter {
                 footer
             } else {
@@ -124,6 +128,42 @@ struct SidebarView: View {
         }
         .contextMenu { WindowContextMenu(state: state, window: window) }
         .transition(.asymmetric(insertion: .scale(scale: 0.8).combined(with: .opacity), removal: .opacity))
+    }
+
+    /// Small numbered desktops; the current one is filled with the accent. Click to switch.
+    private var spacesRow: some View {
+        let columns = Array(repeating: GridItem(.fixed(SidebarMetrics.chip), spacing: SidebarMetrics.chipSpacing), count: metrics.chipsPerRow)
+        return VStack(spacing: 0) {
+            Capsule()
+                .fill(Color.primary.opacity(0.12))
+                .frame(width: metrics.thumbWidth * 0.6, height: 1)
+                .frame(height: SidebarMetrics.dividerBlock)
+            LazyVGrid(columns: columns, spacing: SidebarMetrics.chipSpacing) {
+                ForEach(state.spaces.spaces) { space in
+                    let current = space.id == state.spaces.currentID
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(current ? accent : Color.primary.opacity(0.10))
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(current ? 0 : 0.18), lineWidth: 0.5)
+                        if space.isFullscreen {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 7, weight: .bold))
+                        } else {
+                            Text("\(space.index)")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                        }
+                    }
+                    .foregroundStyle(current ? Color.white : Color.secondary)
+                    .frame(width: SidebarMetrics.chip, height: SidebarMetrics.space)
+                    .contentShape(Rectangle())
+                    .onTapGesture { state.spaces.switchTo(space) }
+                    .help(space.isFullscreen ? "Fullscreen app" : "Desktop \(space.index)")
+                    .animation(.easeOut(duration: 0.15), value: current)
+                }
+            }
+            .frame(width: metrics.thumbWidth)
+        }
     }
 
     private var emptyState: some View {

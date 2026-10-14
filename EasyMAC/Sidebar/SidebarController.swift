@@ -110,6 +110,7 @@ final class SidebarController {
         }
         currentScreen = resolveScreen()
         if !settings.autoHide { autoRevealed = false }
+        state.spaces.refresh()
         installMouseMonitors()
         state.thumbnails.restartTimer()
         applyVisibility(animated: true)
@@ -188,7 +189,8 @@ final class SidebarController {
     // MARK: - Layout
 
     private var metrics: SidebarMetrics {
-        SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter)
+        SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter,
+                       spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0)
     }
 
     private var displayedWindows: [WindowInfo] {
@@ -249,6 +251,7 @@ final class SidebarController {
         withObservationTracking {
             _ = state.windows.windows
             _ = state.workspaces.workspaces
+            _ = state.spaces.spaces
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -290,6 +293,7 @@ final class SidebarController {
            let screen = NSScreen.withMouse, !screen.isSameDisplay(as: currentScreen) {
             currentScreen = screen
             state.windows.settingsChanged()
+            state.spaces.refresh()
             if isRevealed {
                 panel.setFrame(targetFrame(), display: true)
             }

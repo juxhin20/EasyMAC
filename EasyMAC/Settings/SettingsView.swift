@@ -214,6 +214,7 @@ private struct AppearanceSettings: View {
                         }
                         Toggle("Show titles under thumbnails", isOn: $settings.showTitles)
                         Toggle("Show “EasyMAC ⚙” footer", isOn: $settings.showFooter)
+                        Toggle("Show desktops (Spaces) switcher", isOn: $settings.showSpaces)
                     }
                 }
             } header: {

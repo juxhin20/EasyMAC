@@ -15,6 +15,7 @@ final class AppState {
     let workspaces = WorkspaceManager()
     let toast = ToastController()
     let updater = Updater()
+    let spaces = SpacesService()
 
     lazy var sidebar = SidebarController(state: self)
     lazy var snap = SnapController(state: self)
@@ -42,6 +43,8 @@ final class AppState {
         thumbnails.observeSleep()
         HotkeyController.register(self)
         sidebar.start()
+        spaces.screenProvider = { [weak self] in self?.sidebar.screen }
+        spaces.start()
         radial.start()
 
         permissions.onChange = { [weak self] accessibility, _ in
