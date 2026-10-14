@@ -314,6 +314,11 @@ private struct AppearanceSettings: View {
                         Picker("Accent", selection: $settings.sidebarAccent) {
                             ForEach(AccentChoice.allCases) { Text($0.title).tag($0) }
                         }
+                        Picker("Windows shown as", selection: $settings.stripIconsOnly) {
+                            Text("Live previews").tag(false)
+                            Text("App icons").tag(true)
+                        }
+                        .pickerStyle(.segmented)
                         Toggle("Show titles under thumbnails", isOn: $settings.showTitles)
                     }
                 }

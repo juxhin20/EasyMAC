@@ -179,6 +179,7 @@ final class Settings {
     var awakeLastDuration: Double { didSet { store(awakeLastDuration, "awakeLastDuration") } }
     var mouseScrollDirection: MouseScrollDirection { didSet { store(mouseScrollDirection.rawValue, "mouseScrollDirection") } }
     var reverseMouseHorizontal: Bool { didSet { store(reverseMouseHorizontal, "reverseMouseHorizontal") } }
+    var stripIconsOnly: Bool { didSet { store(stripIconsOnly, "stripIconsOnly") } }
     var stripShowTray: Bool { didSet { store(stripShowTray, "stripShowTray") } }
     var stripShowFolders: Bool { didSet { store(stripShowFolders, "stripShowFolders") } }
     var stripShowWorkspaces: Bool { didSet { store(stripShowWorkspaces, "stripShowWorkspaces") } }
@@ -267,6 +268,7 @@ final class Settings {
         showTray = bool("showTray", true)
         showFilesIcon = bool("showFilesIcon", true)
         stripShowTray = bool("stripShowTray", true)
+        stripIconsOnly = bool("stripIconsOnly", false)
         stripShowFolders = bool("stripShowFolders", true)
         stripShowWorkspaces = bool("stripShowWorkspaces", true)
         mouseScrollDirection = d.string(forKey: "mouseScrollDirection").flatMap(MouseScrollDirection.init(rawValue:))

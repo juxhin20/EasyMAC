@@ -17,6 +17,7 @@ struct SidebarMetrics: Equatable {
     var spaceCount = 0
     var fileRowCount = 0
     var showWorkspaces = true
+    var iconsOnly = false
 
     static let fileRow: CGFloat = 18
 
@@ -32,7 +33,9 @@ struct SidebarMetrics: Equatable {
     static let cornerRadius: CGFloat = 14
 
     var panelWidth: CGFloat { thumbWidth + Self.padding * 2 }
-    var thumbHeight: CGFloat { (thumbWidth * 0.66).rounded() }
+    var thumbHeight: CGFloat { iconsOnly ? iconBox : (thumbWidth * 0.66).rounded() }
+    /// App-icons mode: a compact rounded tile per window.
+    var iconBox: CGFloat { (thumbWidth * 0.62).rounded() }
     var cellHeight: CGFloat { thumbHeight + (showTitles ? 15 : 0) }
     var chipsPerRow: Int { max(1, Int((thumbWidth + Self.chipSpacing) / (Self.chip + Self.chipSpacing))) }
 

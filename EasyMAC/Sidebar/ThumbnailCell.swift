@@ -15,7 +15,11 @@ struct ThumbnailCell: View {
 
     var body: some View {
         VStack(spacing: 3) {
-            thumbnail
+            if metrics.iconsOnly {
+                iconTile
+            } else {
+                thumbnail
+            }
             if metrics.showTitles {
                 Text(window.displayTitle)
                     .font(.system(size: 9, weight: .medium))
@@ -30,6 +34,45 @@ struct ThumbnailCell: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(window.appName): \(window.displayTitle)")
         .accessibilityAddTraits(.isButton)
+    }
+
+    /// App-icons mode: just the app icon in a soft tile — compact and no screen capture.
+    private var iconTile: some View {
+        let size = metrics.iconBox
+        return ZStack {
+            RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
+                .fill(Color.primary.opacity(isHovered ? 0.14 : 0.07))
+            if let icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: size * 0.78, height: size * 0.78)
+            }
+        }
+        .frame(width: size, height: size)
+        .overlay(alignment: .topTrailing) {
+            if window.isOffscreen {
+                Circle().fill(Color.secondary).frame(width: 7, height: 7).offset(x: 2, y: -2)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if window.isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 6.5, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(2.5)
+                    .background(Circle().fill(accent))
+                    .offset(x: -2, y: -2)
+            }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
+                .strokeBorder(ringColor, lineWidth: ringWidth)
+        }
+        .opacity(window.isOffscreen ? 0.55 : 1)
+        .scaleEffect(isHovered ? 1.06 : 1)
+        .animation(.spring(response: 0.22, dampingFraction: 0.75), value: isHovered)
+        .frame(width: metrics.thumbWidth)
     }
 
     private var thumbnail: some View {

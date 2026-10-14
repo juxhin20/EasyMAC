@@ -10,7 +10,8 @@ struct SidebarView: View {
         SidebarMetrics(thumbWidth: settings.thumbnailSize.width, showTitles: settings.showTitles, showFooter: settings.showFooter,
                        spaceCount: settings.showSpaces ? state.spaces.spaces.count : 0,
                        fileRowCount: state.stripShelfSources.count,
-                       showWorkspaces: settings.stripShowWorkspaces)
+                       showWorkspaces: settings.stripShowWorkspaces,
+                       iconsOnly: settings.stripIconsOnly)
     }
     private var accent: Color { Color(nsColor: settings.sidebarAccent.nsColor) }
 
