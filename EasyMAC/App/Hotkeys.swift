@@ -7,6 +7,7 @@ extension KeyboardShortcuts.Name {
     static let toggleSidebar = Self("toggleSidebar", initial: .init(.s, modifiers: [.option, .shift]))
     static let saveWorkspace = Self("saveWorkspace", initial: .init(.w, modifiers: [.option, .shift]))
     static let windowSwitcher = Self("windowSwitcher", initial: .init(.tab, modifiers: [.option]))
+    static let clipboardHistory = Self("clipboardHistory", initial: .init(.v, modifiers: [.option, .shift]))
 
     static let snapLeft = Self("snapLeft", initial: .init(.leftArrow, modifiers: [.control, .option]))
     static let snapRight = Self("snapRight", initial: .init(.rightArrow, modifiers: [.control, .option]))
@@ -50,6 +51,7 @@ enum HotkeyController {
         KeyboardShortcuts.onKeyDown(for: .toggleSidebar) { state.toggleSidebar() }
         KeyboardShortcuts.onKeyDown(for: .saveWorkspace) { state.saveCurrentAsWorkspace() }
         KeyboardShortcuts.onKeyDown(for: .windowSwitcher) { state.switcher.advance() }
+        KeyboardShortcuts.onKeyDown(for: .clipboardHistory) { if state.settings.clipboardEnabled { state.clipboardPanel.toggle() } }
 
         let snaps: [(KeyboardShortcuts.Name, SnapAction)] = [
             (.snapLeft, .leftHalf), (.snapRight, .rightHalf), (.snapTop, .topHalf),

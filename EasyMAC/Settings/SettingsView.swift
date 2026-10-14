@@ -11,7 +11,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: "General"
         case .appearance: "Sidebar"
-        case .files: "Files & Tray"
+        case .files: "Files & Clipboard"
         case .snapWheel: "Snap Wheel"
         case .layouts: "Layouts"
         case .workspaces: "Workspaces"
@@ -121,6 +121,10 @@ private struct GeneralSettings: View {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
                 Toggle("Show Dock icon", isOn: $settings.showDockIcon)
+                Toggle(isOn: $settings.showMenuBarIcon) {
+                    Text("Show EasyMAC icon in the menu bar")
+                    Text("When hidden, open EasyMAC again (Spotlight / Finder) to reach Settings.")
+                }
                 Toggle("Open Settings when EasyMAC is launched manually", isOn: $settings.showSettingsOnLaunch)
             } header: {
                 Text("Startup")
@@ -170,6 +174,19 @@ private struct GeneralSettings: View {
                 }
             } header: {
                 Text("Updates")
+            }
+
+            Section {
+                Toggle(isOn: $settings.notchHUD) {
+                    Text("Volume & brightness in the notch")
+                    Text("Volume, mute and brightness keys show a sleek bar under the notch instead of the system popup.")
+                }
+                Toggle(isOn: $settings.notchAwakeIndicator) {
+                    Text("Keep Awake indicator next to the notch")
+                    Text("A small cup with a ring that shows the time left.")
+                }
+            } header: {
+                Text("Notch")
             }
 
             Section {
@@ -381,6 +398,31 @@ private struct FilesSettings: View {
                 Button("Add Folder…") { addFolder() }
             } header: {
                 Text("Pinned folders")
+            }
+
+            Section {
+                Toggle(isOn: $settings.clipboardEnabled) {
+                    Text("Clipboard history")
+                    Text("Press \(HotkeyController.shortcutText(.clipboardHistory) ?? "⌥⇧V") for a bar of everything you copied. Kept in memory only, never saved to disk; password managers are skipped.")
+                }
+                if settings.clipboardEnabled {
+                    Toggle("Show clipboard icon in the menu bar", isOn: $settings.showClipboardIcon)
+                    LabeledContent("Shortcut") {
+                        KeyboardShortcuts.Recorder(for: .clipboardHistory)
+                    }
+                    Toggle("Paste directly when choosing an item", isOn: $settings.clipboardPasteDirectly)
+                    LabeledContent("Remember") {
+                        Stepper("\(settings.clipboardLimit) items", value: $settings.clipboardLimit, in: 10...200, step: 10)
+                    }
+                    HStack {
+                        Text("\(state.clipboard.items.count) items right now").foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Open") { state.clipboardPanel.open() }
+                        Button("Clear History") { state.clipboard.clear() }.disabled(state.clipboard.items.isEmpty)
+                    }
+                }
+            } header: {
+                Text("Clipboard")
             }
 
             Section {
@@ -596,6 +638,7 @@ private struct HotkeySettings: View {
                 KeyboardShortcuts.Recorder("Show / hide sidebar", name: .toggleSidebar)
                 KeyboardShortcuts.Recorder("Save current windows as workspace", name: .saveWorkspace)
                 KeyboardShortcuts.Recorder("Window switcher", name: .windowSwitcher)
+                KeyboardShortcuts.Recorder("Clipboard history", name: .clipboardHistory)
             } header: {
                 Text("Sidebar")
             }
@@ -615,7 +658,7 @@ private struct HotkeySettings: View {
             }
             Section {
                 Button("Reset All to Defaults") {
-                    KeyboardShortcuts.reset([.toggleSidebar, .saveWorkspace, .windowSwitcher]
+                    KeyboardShortcuts.reset([.toggleSidebar, .saveWorkspace, .windowSwitcher, .clipboardHistory]
                         + KeyboardShortcuts.Name.snapNames.map(\.0)
                         + KeyboardShortcuts.Name.workspaceSlots)
                 }

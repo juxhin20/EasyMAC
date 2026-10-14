@@ -16,7 +16,7 @@ enum AwakeMode: String, CaseIterable, Identifiable {
         switch self {
         case .display: "Screen stays on"
         case .system: "Screen may turn off, Mac keeps running"
-        case .lidClosed: "Keeps running even with the lid closed"
+        case .lidClosed: "Lid can be closed, Mac stays awake"
         }
     }
     var symbol: String {
@@ -214,21 +214,22 @@ final class AwakeController: NSObject, NSMenuDelegate {
         forItem.submenu = durations
         menu.addItem(forItem)
 
-        let modeItem = NSMenuItem(title: "Mode: \(settings.awakeMode.title)", action: nil, keyEquivalent: "")
-        modeItem.image = NSImage(systemSymbolName: settings.awakeMode.symbol, accessibilityDescription: nil)
-        let modes = NSMenu()
+        // Modes as buttons right in the menu, each with its explanation underneath.
+        menu.addItem(.separator())
         for mode in AwakeMode.allCases {
             let entry = ClosureMenuItem(mode.title) { [weak self] in
                 self?.settings.awakeMode = mode
                 self?.modeChanged()
             }
             entry.image = NSImage(systemSymbolName: mode.symbol, accessibilityDescription: nil)
-            entry.toolTip = mode.detail
             entry.state = settings.awakeMode == mode ? .on : .off
-            modes.addItem(entry)
+            if #available(macOS 14.4, *) {
+                entry.subtitle = mode.detail
+            } else {
+                entry.toolTip = mode.detail
+            }
+            menu.addItem(entry)
         }
-        modeItem.submenu = modes
-        menu.addItem(modeItem)
 
         menu.addItem(.separator())
         menu.addItem(withSymbol: "gearshape", ClosureMenuItem("Keep Awake Settings…") {

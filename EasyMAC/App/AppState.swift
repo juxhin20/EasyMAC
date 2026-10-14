@@ -18,12 +18,15 @@ final class AppState {
     let spaces = SpacesService()
     let files = FileShelf()
     let awake = AwakeController()
+    let clipboard = ClipboardHistory()
 
     lazy var sidebar = SidebarController(state: self)
     lazy var snap = SnapController(state: self)
     lazy var radial = RadialSnapController(state: self)
     lazy var switcher = SwitcherController(state: self)
     lazy var shelf = FileShelfController(state: self)
+    lazy var clipboardPanel = ClipboardPanelController(state: self)
+    lazy var notch = NotchController(state: self)
     lazy var settingsWindow = SettingsWindowController(state: self)
     lazy var onboarding = OnboardingWindowController(state: self)
     private lazy var restorer = WorkspaceRestorer(area: { [unowned self] in self.usableAreaAX($0) })
@@ -50,11 +53,15 @@ final class AppState {
         spaces.start()
         shelf.restoreFloating()
         awake.start()
+        clipboard.setEnabled(settings.clipboardEnabled)
+        clipboardPanel.updateStatusItem()
+        notch.start()
         radial.start()
 
         permissions.onChange = { [weak self] accessibility, _ in
             guard let self else { return }
             self.radial.start()
+            self.notch.updateTap()
             self.windows.requestRefresh(forceSweep: true)
             if !accessibility && self.settings.hasCompletedOnboarding {
                 // Permission revoked while running: walk the user back through onboarding.
@@ -92,6 +99,18 @@ final class AppState {
             radial.start()
         case "hasCompletedOnboarding", "showSettingsOnLaunch", "awakeLastDuration":
             break
+        case "clipboardEnabled":
+            clipboard.setEnabled(settings.clipboardEnabled)
+        clipboardPanel.updateStatusItem()
+        notch.start()
+            if !settings.clipboardEnabled { clipboard.clear() }
+            clipboardPanel.updateStatusItem()
+        case "showClipboardIcon":
+            clipboardPanel.updateStatusItem()
+        case "clipboardLimit", "clipboardPasteDirectly", "notchAwakeIndicator", "showMenuBarIcon":
+            break
+        case "notchHUD":
+            notch.updateTap()
         case "showAwakeIcon":
             awake.updateItemVisibility()
         case "awakeMode":

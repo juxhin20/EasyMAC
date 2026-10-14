@@ -163,6 +163,13 @@ final class Settings {
     var showSpaces: Bool { didSet { store(showSpaces, "showSpaces") } }
     var showFiles: Bool { didSet { store(showFiles, "showFiles") } }
     var showAwakeIcon: Bool { didSet { store(showAwakeIcon, "showAwakeIcon") } }
+    var clipboardEnabled: Bool { didSet { store(clipboardEnabled, "clipboardEnabled") } }
+    var clipboardLimit: Int { didSet { store(clipboardLimit, "clipboardLimit") } }
+    var showClipboardIcon: Bool { didSet { store(showClipboardIcon, "showClipboardIcon") } }
+    var clipboardPasteDirectly: Bool { didSet { store(clipboardPasteDirectly, "clipboardPasteDirectly") } }
+    var showMenuBarIcon: Bool { didSet { store(showMenuBarIcon, "showMenuBarIcon") } }
+    var notchHUD: Bool { didSet { store(notchHUD, "notchHUD") } }
+    var notchAwakeIndicator: Bool { didSet { store(notchAwakeIndicator, "notchAwakeIndicator") } }
     var awakeMode: AwakeMode { didSet { store(awakeMode.rawValue, "awakeMode") } }
     var awakeLastDuration: Double { didSet { store(awakeLastDuration, "awakeLastDuration") } }
     var showTray: Bool { didSet { store(showTray, "showTray") } }
@@ -231,6 +238,13 @@ final class Settings {
         showSpaces = bool("showSpaces", false)
         showFiles = bool("showFiles", true)
         showAwakeIcon = bool("showAwakeIcon", true)
+        clipboardEnabled = bool("clipboardEnabled", true)
+        clipboardLimit = int("clipboardLimit", 60)
+        clipboardPasteDirectly = bool("clipboardPasteDirectly", true)
+        showClipboardIcon = bool("showClipboardIcon", true)
+        notchHUD = bool("notchHUD", true)
+        showMenuBarIcon = bool("showMenuBarIcon", true)
+        notchAwakeIndicator = bool("notchAwakeIndicator", true)
         awakeMode = choice("awakeMode", AwakeMode.display)
         awakeLastDuration = double("awakeLastDuration", 0)
         showTray = bool("showTray", true)

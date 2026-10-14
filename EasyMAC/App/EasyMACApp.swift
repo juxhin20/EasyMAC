@@ -6,7 +6,8 @@ struct EasyMACApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(isInserted: Binding(get: { Settings.shared.showMenuBarIcon },
+                                         set: { Settings.shared.showMenuBarIcon = $0 })) {
             MenuBarMenu(state: AppState.shared)
         } label: {
             Image(nsImage: MenuBarIcon.image)
@@ -42,6 +43,10 @@ struct MenuBarMenu: View {
         }
 
         Divider()
+
+        if state.settings.clipboardEnabled {
+            Button("Clipboard History") { state.clipboardPanel.open() }
+        }
 
         Menu("Arrange Windows") {
             ForEach(LayoutPreset.allCases) { preset in
