@@ -98,7 +98,9 @@ final class WindowService {
                         AppIconCache.forget(pid: pid)
                     }
                     self.requestRefresh(forceSweep: true)
-                    if name == NSWorkspace.activeSpaceDidChangeNotification { self.burstAfterSpaceChange() }
+                    if name == NSWorkspace.activeSpaceDidChangeNotification {
+                        self.burstAfterSpaceChange()
+                    }
                 }
             })
         }

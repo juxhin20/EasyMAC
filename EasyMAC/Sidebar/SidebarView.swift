@@ -80,7 +80,7 @@ struct SidebarView: View {
                 model.updateHover()
             }
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: windows.map(\.windowID))
+        .animation(.spring(response: 0.2, dampingFraction: 0.9), value: windows.map(\.windowID))
     }
 
     // MARK: - Pieces

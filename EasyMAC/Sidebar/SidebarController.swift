@@ -298,7 +298,7 @@ final class SidebarController {
         guard target != panel.frame else { return }
         if animated {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.2
+                context.duration = 0.14
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(target, display: true)
             }
