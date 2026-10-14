@@ -22,11 +22,18 @@ struct Workspace: Codable, Identifiable, Equatable, Sendable {
     }
 
     var initials: String {
-        let words = name.split(whereSeparator: { $0.isWhitespace || $0 == "-" || $0 == "_" })
+        // Only letters/digits count: app names can carry invisible marks (WhatsApp starts with U+200E).
+        let words = name.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
         if words.count >= 2, let a = words[0].first, let b = words[1].first {
             return String([a, b]).uppercased()
         }
-        return String(name.prefix(2)).uppercased()
+        return String((words.first ?? Substring(name)).prefix(2)).uppercased()
+    }
+
+    /// Removes invisible formatting characters (e.g. U+200E) and trims whitespace.
+    static func clean(_ text: String) -> String {
+        String(String.UnicodeScalarView(text.unicodeScalars.filter { $0.properties.generalCategory != .format }))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static let palette = ["#D22027", "#0A84FF", "#30D158", "#FF9F0A", "#BF5AF2", "#64D2FF", "#FF375F", "#FFD60A", "#8E8E93"]

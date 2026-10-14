@@ -151,7 +151,7 @@ final class RadialSnapController {
         let p = NSEvent.mouseLocation
         let direction = LayoutEngine.radialDirection(dx: p.x - origin.x, dy: p.y - origin.y, deadZone: 14)
         let screen = NSScreen.withMouse
-        guard force || direction != model.direction || screen != lastScreen else { return }
+        guard force || direction != model.direction || !(screen?.isSameDisplay(as: lastScreen) ?? false) else { return }
         if direction != model.direction { haptic() }
         model.set(direction)
         lastScreen = screen

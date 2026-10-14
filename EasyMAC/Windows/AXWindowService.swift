@@ -101,6 +101,7 @@ final class AXWindowService: @unchecked Sendable {
     /// Returns `false` when the window no longer exists (IDs are validated before acting).
     @discardableResult
     func focus(windowID: CGWindowID, pid: pid_t) async -> Bool {
+        guard pid != ProcessInfo.processInfo.processIdentifier else { return false }
         let unhid = await MainActor.run { () -> Bool in
             guard let app = NSRunningApplication(processIdentifier: pid) else { return false }
             if app.isHidden { app.unhide() }
@@ -130,7 +131,17 @@ final class AXWindowService: @unchecked Sendable {
     /// Moves/resizes a window (AX coordinates). `windowID == nil` targets the app's focused window.
     @discardableResult
     func setFrame(_ frame: CGRect, windowID: CGWindowID?, pid: pid_t) async -> Bool {
-        await run { [self] in
+        if pid == ProcessInfo.processInfo.processIdentifier {
+            // AX-setting our own windows from a background thread crashes AppKit; use NSWindow directly.
+            return await MainActor.run {
+                let window = NSApp.windows.first { CGWindowID($0.windowNumber) == windowID && $0.isVisible }
+                    ?? NSApp.keyWindow ?? NSApp.mainWindow
+                guard let window, !(window is NSPanel) else { return false }
+                window.setFrame(Coordinates.axToAppKit(frame, primaryHeight: NSScreen.primaryHeight), display: true, animate: true)
+                return true
+            }
+        }
+        return await run { [self] in
             let app = application(pid)
             let window: AXUIElement?
             if let windowID {
@@ -149,6 +160,7 @@ final class AXWindowService: @unchecked Sendable {
     }
 
     func setMinimized(_ minimized: Bool, windowID: CGWindowID, pid: pid_t) async {
+        guard pid != ProcessInfo.processInfo.processIdentifier else { return }
         await run { [self] in
             guard let window = findWindow(pid: pid, windowID: windowID) else { return }
             AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, minimized as CFTypeRef)
@@ -156,6 +168,7 @@ final class AXWindowService: @unchecked Sendable {
     }
 
     func close(windowID: CGWindowID, pid: pid_t) async {
+        guard pid != ProcessInfo.processInfo.processIdentifier else { return }
         await run { [self] in
             guard let window = findWindow(pid: pid, windowID: windowID),
                   let button = element(window, kAXCloseButtonAttribute) else { return }

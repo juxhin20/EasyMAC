@@ -38,7 +38,7 @@ final class SidebarController {
         currentScreen = resolveScreen()
         state.windows.displayFilter = { [weak self] frame in
             guard let self, let screen = self.currentScreen else { return true }
-            return NSScreen.screen(forAXRect: frame) == screen
+            return NSScreen.screen(forAXRect: frame)?.isSameDisplay(as: screen) == true
         }
 
         let center = NotificationCenter.default
@@ -287,7 +287,7 @@ final class SidebarController {
         let mouse = NSEvent.mouseLocation
 
         if settings.sidebarDisplay == .mouse, !panel.frame.insetBy(dx: -20, dy: -20).contains(mouse),
-           let screen = NSScreen.withMouse, screen != currentScreen {
+           let screen = NSScreen.withMouse, !screen.isSameDisplay(as: currentScreen) {
             currentScreen = screen
             state.windows.settingsChanged()
             if isRevealed {

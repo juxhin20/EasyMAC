@@ -97,7 +97,7 @@ struct SidebarView: View {
     private func cell(_ window: WindowInfo) -> some View {
         ThumbnailCell(
             window: window,
-            image: settings.showThumbnails ? state.thumbnails.thumbnails[window.windowID] : nil,
+            box: settings.showThumbnails ? state.thumbnails.box(window.windowID) : nil,
             metrics: metrics,
             isHovered: model.hoveredID == window.windowID,
             isSelected: model.selectionID == window.windowID,
@@ -108,7 +108,7 @@ struct SidebarView: View {
         })
         .onTapGesture { state.focus(window) }
         .draggable(String(window.windowID)) {
-            ThumbnailCell(window: window, image: state.thumbnails.thumbnails[window.windowID], metrics: metrics,
+            ThumbnailCell(window: window, box: state.thumbnails.box(window.windowID), metrics: metrics,
                           isHovered: false, isSelected: false, accent: accent)
         }
         .dropDestination(for: String.self) { items, _ in

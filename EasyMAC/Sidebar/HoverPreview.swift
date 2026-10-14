@@ -16,7 +16,7 @@ struct HoverPreviewView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.black.opacity(0.25))
-                    if let image = (thumbnails.hoverImageID == window.windowID ? thumbnails.hoverImage : nil) ?? thumbnails.thumbnails[window.windowID] {
+                    if let image = (thumbnails.hoverImageID == window.windowID ? thumbnails.hoverImage : nil) ?? thumbnails.box(window.windowID).image {
                         Image(nsImage: image)
                             .resizable()
                             .interpolation(.high)

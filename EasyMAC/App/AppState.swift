@@ -58,7 +58,11 @@ final class AppState {
             MainActor.assumeIsolated { self?.settingsChanged(key: key) }
         }
 
-        if !settings.hasCompletedOnboarding || !permissions.accessibilityGranted {
+        // `open EasyMAC.app --args -settingsTab workspaces` jumps straight to a tab (handy for support/testing).
+        if let raw = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["settingsTab"] as? String,
+           let tab = SettingsTab(rawValue: raw) {
+            settingsWindow.show(tab: tab)
+        } else if !settings.hasCompletedOnboarding || !permissions.accessibilityGranted {
             onboarding.show()
         } else if settings.showSettingsOnLaunch && !launchedAtLogin {
             settingsWindow.show()
@@ -93,7 +97,7 @@ final class AppState {
     func usableAreaAX(_ screen: NSScreen) -> CGRect {
         var area = screen.visibleFrameAX
         let reserved = sidebar.reservedWidth
-        guard settings.reserveSidebarSpace, reserved > 0, screen == sidebar.screen else { return area }
+        guard settings.reserveSidebarSpace, reserved > 0, screen.isSameDisplay(as: sidebar.screen) else { return area }
         area.size.width -= reserved
         if settings.sidebarEdge == .left { area.origin.x += reserved }
         return area
@@ -148,7 +152,7 @@ final class AppState {
         await windows.refresh(forceSweep: true)
         let all = windows.allWindows.filter { !$0.isOffscreen }.sorted { $0.lastActivated > $1.lastActivated }
         guard let screen = NSScreen.withMouse else { return all }
-        let onScreen = all.filter { NSScreen.screen(forAXRect: $0.frame) == screen }
+        let onScreen = all.filter { NSScreen.screen(forAXRect: $0.frame)?.isSameDisplay(as: screen) == true }
         return onScreen.isEmpty ? all : onScreen
     }
 

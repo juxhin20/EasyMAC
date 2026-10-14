@@ -8,7 +8,7 @@ struct WorkspaceEditorView: View {
     private var manager: WorkspaceManager { state.workspaces }
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             VStack(spacing: 0) {
                 List(selection: $nav.selectedWorkspace) {
                     ForEach(manager.workspaces) { workspace in
@@ -39,7 +39,8 @@ struct WorkspaceEditorView: View {
                 .buttonStyle(.borderless)
                 .padding(6)
             }
-            .frame(minWidth: 180, idealWidth: 200, maxWidth: 260)
+            .frame(width: 190)
+            Divider()
 
             Group {
                 if let id = nav.selectedWorkspace, let workspace = manager.workspace(id) {
@@ -57,7 +58,7 @@ struct WorkspaceEditorView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
             if nav.selectedWorkspace == nil { nav.selectedWorkspace = manager.workspaces.first?.id }
@@ -76,11 +77,11 @@ private struct WorkspaceDetail: View {
             Section {
                 TextField("Name", text: $workspace.name)
                 LabeledContent("Color") {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         ForEach(Workspace.palette, id: \.self) { hex in
                             Circle()
                                 .fill(Color(hex: hex).gradient)
-                                .frame(width: 18, height: 18)
+                                .frame(width: 16, height: 16)
                                 .overlay(Circle().strokeBorder(Color.primary, lineWidth: workspace.colorHex == hex ? 2 : 0).padding(-3))
                                 .onTapGesture { workspace.colorHex = hex }
                         }
@@ -89,13 +90,13 @@ private struct WorkspaceDetail: View {
                 Picker("Hotkey slot", selection: $workspace.hotkeyIndex) {
                     Text("None").tag(Int?.none)
                     ForEach(1...9, id: \.self) { slot in
-                        Text(HotkeyController.workspaceShortcutText(slot).map { "\(slot)  —  \($0)" } ?? "\(slot)").tag(Int?.some(slot))
+                        Text(HotkeyController.workspaceShortcutText(slot) ?? "Slot \(slot)").tag(Int?.some(slot))
                     }
                 }
                 Picker("On restore", selection: $workspace.layout) {
-                    Text("Use saved positions").tag(LayoutPreset?.none)
+                    Text("Saved positions").tag(LayoutPreset?.none)
                     ForEach(LayoutPreset.allCases) { preset in
-                        Label("Tile: \(preset.title)", systemImage: preset.symbol).tag(LayoutPreset?.some(preset))
+                        Text(preset.title).tag(LayoutPreset?.some(preset))
                     }
                 }
             }
@@ -105,26 +106,38 @@ private struct WorkspaceDetail: View {
                     Text("No windows. Use “Update from Current Windows” or drag a thumbnail onto this workspace's chip in the sidebar.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                List {
-                    ForEach($workspace.items) { $item in
-                        ItemRow(item: $item) {
-                            workspace.items.removeAll { $0.id == item.id }
-                        }
-                    }
-                    .onMove { workspace.items.move(fromOffsets: $0, toOffset: $1) }
+                ForEach(Array(workspace.items.enumerated()), id: \.element.id) { index, item in
+                    ItemRow(item: $workspace.items[index],
+                            canMoveUp: index > 0,
+                            canMoveDown: index < workspace.items.count - 1,
+                            onMove: { offset in
+                                let target = index + offset
+                                guard workspace.items.indices.contains(target) else { return }
+                                workspace.items.swapAt(index, target)
+                            },
+                            onRemove: { workspace.items.removeAll { $0.id == item.id } })
                 }
-                .frame(minHeight: CGFloat(max(workspace.items.count, 1)) * 58)
             } header: {
                 Text("Windows (\(workspace.items.count)) — first one ends up focused")
             }
 
             Section {
-                HStack {
-                    Button("Restore Now") { state.restoreWorkspace(workspace.id) }
-                        .buttonStyle(.borderedProminent).tint(Brand.red)
-                    Button("Update from Current Windows") { state.updateWorkspaceWithCurrentWindows(workspace.id) }
-                    Spacer()
-                    Button("Delete", role: .destructive) { manager.delete(workspace.id) }
+                ViewThatFits(in: .horizontal) {
+                    HStack {
+                        Button("Restore Now") { state.restoreWorkspace(workspace.id) }
+                            .buttonStyle(.borderedProminent).tint(Brand.red)
+                        Button("Update from Current") { state.updateWorkspaceWithCurrentWindows(workspace.id) }
+                        Spacer(minLength: 8)
+                        Button("Delete", role: .destructive) { manager.delete(workspace.id) }
+                    }
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Button("Restore Now") { state.restoreWorkspace(workspace.id) }
+                                .buttonStyle(.borderedProminent).tint(Brand.red)
+                            Button("Update from Current") { state.updateWorkspaceWithCurrentWindows(workspace.id) }
+                        }
+                        Button("Delete", role: .destructive) { manager.delete(workspace.id) }
+                    }
                 }
             }
         }
@@ -139,6 +152,9 @@ private struct WorkspaceDetail: View {
 
 private struct ItemRow: View {
     @Binding var item: WorkspaceItem
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    let onMove: (Int) -> Void
     let onRemove: () -> Void
 
     var body: some View {
@@ -154,8 +170,15 @@ private struct ItemRow: View {
                 ))
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 11))
+                .frame(minWidth: 80, maxWidth: .infinity)
             }
             FramePreview(rect: item.relativeFrame)
+            VStack(spacing: 2) {
+                Button { onMove(-1) } label: { Image(systemName: "chevron.up") }.disabled(!canMoveUp)
+                Button { onMove(1) } label: { Image(systemName: "chevron.down") }.disabled(!canMoveDown)
+            }
+            .buttonStyle(.borderless)
+            .font(.system(size: 9, weight: .bold))
             Button(action: onRemove) {
                 Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
             }

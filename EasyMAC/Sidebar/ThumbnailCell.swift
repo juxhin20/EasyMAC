@@ -3,13 +3,15 @@ import SwiftUI
 
 struct ThumbnailCell: View {
     let window: WindowInfo
-    let image: NSImage?
+    /// Read inside this view only, so captures don't re-render the whole strip.
+    let box: ThumbnailBox?
     let metrics: SidebarMetrics
     let isHovered: Bool
     let isSelected: Bool
     let accent: Color
 
     private var icon: NSImage? { AppIconCache.icon(pid: window.pid) }
+    private var image: NSImage? { box?.image }
 
     var body: some View {
         VStack(spacing: 3) {

@@ -69,5 +69,7 @@ final class WorkspaceStoreTests: XCTestCase {
     func testInitials() {
         XCTAssertEqual(Workspace(name: "AppAlbania Clients", colorHex: "#fff").initials, "AC")
         XCTAssertEqual(Workspace(name: "dtis", colorHex: "#fff").initials, "DT")
+        XCTAssertEqual(Workspace(name: "\u{200E}WhatsApp + Chrome", colorHex: "#fff").initials, "WC")
+        XCTAssertEqual(Workspace.clean("\u{200E}WhatsApp "), "WhatsApp")
     }
 }

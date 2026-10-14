@@ -91,7 +91,7 @@ struct SettingsView: View {
             }
             .navigationTitle(nav.tab.title)
         }
-        .frame(minWidth: 760, minHeight: 540)
+        .frame(minWidth: 860, minHeight: 560)
     }
 }
 
@@ -648,10 +648,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             window.toolbarStyle = .unified
             window.isReleasedWhenClosed = false
             window.delegate = self
-            window.setContentSize(NSSize(width: 820, height: 600))
+            host.sizingOptions = []
+            window.setContentSize(NSSize(width: 920, height: 640))
+            window.contentMinSize = NSSize(width: 860, height: 560)
             self.window = window
             window.centerOnMouseScreen()
-        } else if let window, !window.isVisible || window.screen != NSScreen.withMouse {
+        } else if let window, !window.isVisible || !(window.screen?.isSameDisplay(as: NSScreen.withMouse) ?? false) {
             window.centerOnMouseScreen()
         }
         NSApp.activate()

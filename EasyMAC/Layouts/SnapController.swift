@@ -22,6 +22,12 @@ final class SnapController {
     /// Focused window of the frontmost app.
     func focusedTarget() async -> Target? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        if app.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            // Our own Settings window: read it from AppKit, never through AX.
+            guard let window = NSApp.keyWindow ?? NSApp.mainWindow, !(window is NSPanel) else { return nil }
+            return Target(pid: app.processIdentifier, windowID: CGWindowID(window.windowNumber),
+                          frame: Coordinates.appKitToAX(window.frame, primaryHeight: NSScreen.primaryHeight))
+        }
         guard let focused = await ax.focusedWindow(pid: app.processIdentifier) else { return nil }
         return Target(pid: focused.pid, windowID: focused.windowID, frame: focused.frame)
     }
@@ -69,7 +75,7 @@ final class SnapController {
         await state.windows.refresh(forceSweep: true)
         guard let screen = NSScreen.withMouse else { return }
         let windows = state.windows.allWindows
-            .filter { !$0.isOffscreen && NSScreen.screen(forAXRect: $0.frame) == screen }
+            .filter { !$0.isOffscreen && NSScreen.screen(forAXRect: $0.frame)?.isSameDisplay(as: screen) == true }
             .sorted { $0.lastActivated > $1.lastActivated }
             .prefix(12)
         guard !windows.isEmpty else { return }

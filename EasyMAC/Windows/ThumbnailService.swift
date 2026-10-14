@@ -7,9 +7,15 @@ import Observation
 /// - Only runs while the sidebar is visible (`setActive`).
 /// - Visible thumbnails refresh every `Settings.refreshInterval` seconds; the hovered window at ~2 fps.
 /// - At most 3 captures are in flight; requests for a window already being captured are dropped.
+/// One observable box per window so a new capture only re-renders that window's cell.
+@MainActor @Observable
+final class ThumbnailBox {
+    var image: NSImage?
+}
+
 @MainActor @Observable
 final class ThumbnailService {
-    private(set) var thumbnails: [CGWindowID: NSImage] = [:]
+    @ObservationIgnored private var boxes: [CGWindowID: ThumbnailBox] = [:]
     private(set) var hoverImage: NSImage?
     private(set) var hoverImageID: CGWindowID?
 
@@ -29,6 +35,15 @@ final class ThumbnailService {
     @ObservationIgnored var canCapture: () -> Bool = { CGPreflightScreenCaptureAccess() }
 
     private let maxConcurrent = 3
+
+    func box(_ id: CGWindowID) -> ThumbnailBox {
+        if let box = boxes[id] { return box }
+        let box = ThumbnailBox()
+        boxes[id] = box
+        return box
+    }
+
+    func image(_ id: CGWindowID) -> NSImage? { boxes[id]?.image }
 
     // MARK: - Control
 
@@ -63,12 +78,12 @@ final class ThumbnailService {
         visible = windows
         if changedSet { contentStamp = .distantPast }
         let alive = Set(windows.map(\.windowID))
-        if thumbnails.keys.contains(where: { !alive.contains($0) }) {
-            thumbnails = thumbnails.filter { alive.contains($0.key) }
+        if boxes.keys.contains(where: { !alive.contains($0) }) {
+            boxes = boxes.filter { alive.contains($0.key) }
             stamps = stamps.filter { alive.contains($0.key) }
         }
         guard isActive else { return }
-        for window in windows where thumbnails[window.windowID] == nil && !window.isOffscreen {
+        for window in windows where image(window.windowID) == nil && !window.isOffscreen {
             enqueue(window, hover: false)
         }
     }
@@ -77,7 +92,7 @@ final class ThumbnailService {
         hovered = window
         if hoverImageID != window.windowID {
             hoverImageID = window.windowID
-            hoverImage = thumbnails[window.windowID]
+            hoverImage = image(window.windowID)
         }
         hoverTimer?.invalidate()
         guard isActive, !window.isOffscreen else { return }
@@ -136,7 +151,7 @@ final class ThumbnailService {
                     hoverImageID = window.windowID
                 }
             } else {
-                thumbnails[window.windowID] = nsImage
+                box(window.windowID).image = nsImage
                 stamps[window.windowID] = Date()
             }
         }
@@ -160,7 +175,7 @@ final class ThumbnailService {
 
     private func shareableWindow(_ id: CGWindowID) async -> SCWindow? {
         let now = Date()
-        let stale = now.timeIntervalSince(contentStamp) > 5
+        let stale = now.timeIntervalSince(contentStamp) > 10
         let missing = content?.windows.contains { $0.windowID == id } != true
         if stale || (missing && now.timeIntervalSince(contentStamp) > 0.75) {
             await reloadContent()

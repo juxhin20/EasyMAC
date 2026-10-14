@@ -67,6 +67,12 @@ extension NSScreen {
         return localizedName
     }
 
+    func isSameDisplay(as other: NSScreen?) -> Bool {
+        guard let other else { return false }
+        if let a = displayID, let b = other.displayID { return a == b }
+        return frame == other.frame
+    }
+
     static func screen(withStableID id: String?) -> NSScreen? {
         guard let id else { return nil }
         return screens.first { $0.stableID == id } ?? screens.first { $0.localizedName == id }

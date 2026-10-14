@@ -62,6 +62,7 @@ final class WindowService {
     @ObservationIgnored private var axReadable: Set<pid_t> = []
     @ObservationIgnored private var lastSweep = Date.distantPast
     @ObservationIgnored private var lastTop: CGWindowID?
+    @ObservationIgnored private var lastOnScreen = Set<CGWindowID>()
     @ObservationIgnored private var isRefreshing = false
     @ObservationIgnored private var pendingRefresh = false
     @ObservationIgnored private var pendingForceSweep = false
@@ -191,7 +192,10 @@ final class WindowService {
         }
 
         let hasUnconfirmed = candidates.contains { axWindows[$0.id] == nil && (firstSeen[$0.id] ?? now) > lastSweep }
-        let sweepDue = forceSweep || hasUnconfirmed || now.timeIntervalSince(lastSweep) > 2.0
+        let currentIDs = Set(candidates.map(\.id))
+        let disappeared = !lastOnScreen.subtracting(currentIDs).isEmpty // minimized or closed: ask AX which
+        lastOnScreen = currentIDs
+        let sweepDue = forceSweep || hasUnconfirmed || disappeared || now.timeIntervalSince(lastSweep) > 4.0
         if sweepDue, AXIsProcessTrusted() {
             await sweep(extraPIDs: candidates.map(\.pid), excluded: excluded)
         }
@@ -309,7 +313,7 @@ final class WindowService {
     private func appInfo(_ pid: pid_t) -> (bundleID: String?, name: String, regular: Bool) {
         if let cached = apps[pid] { return cached }
         let app = NSRunningApplication(processIdentifier: pid)
-        let info = (app?.bundleIdentifier, app?.localizedName ?? "", app?.activationPolicy == .regular)
+        let info = (app?.bundleIdentifier, Workspace.clean(app?.localizedName ?? ""), app?.activationPolicy == .regular)
         apps[pid] = info
         return info
     }
