@@ -216,6 +216,19 @@ private struct GeneralSettings: View {
                     Text("Volume & brightness in the notch")
                     Text("Volume, mute and brightness keys show a sleek bar under the notch instead of the system popup.")
                 }
+                if settings.notchHUD {
+                    Picker("Volume step", selection: $settings.volumeStepPercent) {
+                        ForEach([1, 2, 3, 5, 6, 10], id: \.self) { Text("\($0)%").tag($0) }
+                    }
+                    Picker("Brightness step", selection: $settings.brightnessStepPercent) {
+                        ForEach([1, 2, 3, 5, 6, 10], id: \.self) { Text("\($0)%").tag($0) }
+                    }
+                    Picker("Lowest brightness", selection: $settings.minBrightnessPercent) {
+                        ForEach([0, 5, 10, 15, 20, 25], id: \.self) { Text($0 == 0 ? "Off (can go dark)" : "\($0)%").tag($0) }
+                    }
+                    Text("6% is the macOS default. Hold ⌥⇧ while pressing the keys for 1% steps.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             } header: {
                 Text("Notch")
             }

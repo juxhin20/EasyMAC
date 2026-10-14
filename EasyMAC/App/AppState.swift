@@ -135,6 +135,8 @@ final class AppState {
             mouse.update()
         case "notchTray":
             notchDrop.update()
+        case "volumeStepPercent", "brightnessStepPercent", "minBrightnessPercent":
+            notch.applyStepSettings()
         case "notchHUD":
             notch.updateTap()
         case "showAwakeIcon":

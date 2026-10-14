@@ -152,6 +152,16 @@ final class NotchController {
     nonisolated(unsafe) private var runLoopSource: CFRunLoopSource?
 
     nonisolated(unsafe) static weak var shared: NotchController?
+    /// Read on the event-tap thread; refreshed from Settings by `applyStepSettings()`.
+    nonisolated(unsafe) static var volumeStep: Float = 1.0 / 16
+    nonisolated(unsafe) static var brightnessStep: Float = 1.0 / 16
+    nonisolated(unsafe) static var minBrightness: Float = 0.10
+
+    func applyStepSettings() {
+        Self.volumeStep = Float(state.settings.volumeStepPercent) / 100
+        Self.brightnessStep = Float(state.settings.brightnessStepPercent) / 100
+        Self.minBrightness = Float(state.settings.minBrightnessPercent) / 100
+    }
 
     init(state: AppState) {
         self.state = state
@@ -159,6 +169,7 @@ final class NotchController {
     }
 
     func start() {
+        applyStepSettings()
         updateTap()
         observeAwake()
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
@@ -205,14 +216,15 @@ final class NotchController {
     /// Runs on the event-tap thread (CoreAudio / DisplayServices are thread-safe). Returns true when
     /// the key was handled and should be swallowed; the HUD is drawn on the main thread.
     nonisolated static func handle(key: Int32, down: Bool, fine: Bool) -> Bool {
-        let step: Float = fine ? 1.0 / 64 : 1.0 / 16
+        let volumeStep: Float = fine ? 0.01 : NotchController.volumeStep
+        let brightnessStep: Float = fine ? 0.01 : NotchController.brightnessStep
         let hud: (NotchModel.Kind, Float, Bool)?
         switch key {
         case 0, 1: // NX_KEYTYPE_SOUND_UP / DOWN
             guard let current = SystemControls.volume else { return false }
             guard down else { return true }
             let base = SystemControls.isMuted == true && key == 0 ? 0 : current
-            let target = min(max(((base + (key == 0 ? step : -step)) / step).rounded() * step, 0), 1)
+            let target = min(max(((base + (key == 0 ? volumeStep : -volumeStep)) / volumeStep).rounded() * volumeStep, 0), 1)
             guard SystemControls.setVolume(target) else { return false }
             if target <= 0 { SystemControls.setMuted(true) }
             hud = (.volume, SystemControls.volume ?? target, SystemControls.isMuted ?? false)
@@ -224,7 +236,10 @@ final class NotchController {
         case 2, 3: // NX_KEYTYPE_BRIGHTNESS_UP / DOWN
             guard let current = SystemControls.brightness else { return false }
             guard down else { return true }
-            let target = min(max(((current + (key == 2 ? step : -step)) / step).rounded() * step, 0), 1)
+            // Never below the minimum (default 10%): at 0 the screen goes dark and you can't see anything.
+            let floor = NotchController.minBrightness
+            let stepped = ((current + (key == 2 ? brightnessStep : -brightnessStep)) / brightnessStep).rounded() * brightnessStep
+            let target = min(max(stepped, floor), 1)
             guard SystemControls.setBrightness(target) else { return false }
             hud = (.brightness, target, false)
         default:
