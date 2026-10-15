@@ -104,6 +104,7 @@ final class AppState {
         workspaces.saveNow()
         awake.willTerminate()
         clipboard.saveForRelaunch()
+        ExternalBrightness.restoreAll()
     }
 
     private func settingsChanged(key: String?) {
@@ -139,6 +140,9 @@ final class AppState {
             notch.applyStepSettings()
         case "notchHUD":
             notch.updateTap()
+            notch.updateExternalBrightness()
+        case "brightnessFollowsPointer":
+            notch.updateExternalBrightness()
         case "showAwakeIcon":
             awake.updateItemVisibility()
         case "awakeMode":

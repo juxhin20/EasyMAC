@@ -156,11 +156,20 @@ final class NotchController {
     nonisolated(unsafe) static var volumeStep: Float = 1.0 / 16
     nonisolated(unsafe) static var brightnessStep: Float = 1.0 / 16
     nonisolated(unsafe) static var minBrightness: Float = 0.10
+    nonisolated(unsafe) static var brightnessFollowsPointer = true
+    private var hudDisplay: CGDirectDisplayID?
 
     func applyStepSettings() {
         Self.volumeStep = Float(state.settings.volumeStepPercent) / 100
         Self.brightnessStep = Float(state.settings.brightnessStepPercent) / 100
         Self.minBrightness = Float(state.settings.minBrightnessPercent) / 100
+    }
+
+    /// Brightness keys on an external monitor when the pointer is on it (needs the notch HUD's key tap).
+    func updateExternalBrightness() {
+        let on = state.settings.notchHUD && state.settings.brightnessFollowsPointer
+        Self.brightnessFollowsPointer = on
+        if on { ExternalBrightness.refresh() } else { ExternalBrightness.restoreAll() }
     }
 
     init(state: AppState) {
@@ -171,9 +180,15 @@ final class NotchController {
     func start() {
         applyStepSettings()
         updateTap()
+        updateExternalBrightness()
         observeAwake()
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { _ in
+            if NotchController.brightnessFollowsPointer { ExternalBrightness.refresh() }
+        }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
+                if NotchController.brightnessFollowsPointer { ExternalBrightness.refresh() }
+                self?.hudPanel?.orderOut(nil)
                 self?.hudPanel = nil
                 self?.pillPanel?.orderOut(nil)
                 self?.pillPanel = nil
@@ -219,7 +234,20 @@ final class NotchController {
         let volumeStep: Float = fine ? 0.01 : NotchController.volumeStep
         let brightnessStep: Float = fine ? 0.01 : NotchController.brightnessStep
         let hud: (NotchModel.Kind, Float, Bool)?
+        var hudDisplay: CGDirectDisplayID?
+        let isBrightness = key == 2 || key == 3
+        let external = isBrightness && NotchController.brightnessFollowsPointer ? ExternalBrightness.externalDisplayUnderPointer() : nil
         switch key {
+        case _ where external != nil:
+            // Pointer on an external monitor: change that screen instead of the built-in one.
+            guard let display = external else { return false }
+            guard down else { return true }
+            let current = ExternalBrightness.level(of: display)
+            let stepped = ((current + (key == 2 ? brightnessStep : -brightnessStep)) / brightnessStep).rounded() * brightnessStep
+            let target = min(max(stepped, NotchController.minBrightness), 1)
+            ExternalBrightness.set(target, on: display)
+            hud = (.brightness, target, false)
+            hudDisplay = display
         case 0, 1: // NX_KEYTYPE_SOUND_UP / DOWN
             guard let current = SystemControls.volume else { return false }
             guard down else { return true }
@@ -246,8 +274,9 @@ final class NotchController {
             return false
         }
         if let hud {
+            let hudDisplay = hudDisplay
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { NotchController.shared?.show(hud.0, level: hud.1, muted: hud.2) }
+                MainActor.assumeIsolated { NotchController.shared?.show(hud.0, level: hud.1, muted: hud.2, on: hudDisplay) }
             }
         }
         return true
@@ -261,12 +290,20 @@ final class NotchController {
         show(.volume, level: SystemControls.volume ?? 0.5, muted: SystemControls.isMuted ?? false, hold: 6)
     }
 
-    func show(_ kind: NotchModel.Kind, level: Float, muted: Bool, hold: Double = 1.5) {
-        guard let screen = NSScreen.notchScreen ?? NSScreen.withMouse else { return }
+    /// `display`: an external monitor whose brightness changed — the HUD shows at the top of that screen.
+    func show(_ kind: NotchModel.Kind, level: Float, muted: Bool, hold: Double = 1.5, on display: CGDirectDisplayID? = nil) {
+        let target = display.flatMap { id in NSScreen.screens.first { $0.displayID == id } }
+        guard let screen = target ?? NSScreen.notchScreen ?? NSScreen.withMouse else { return }
         let barHeight = max(screen.frame.maxY - screen.visibleFrame.maxY, 24)
-        let notch = screen.notchRect ?? NSRect(x: screen.frame.midX - 40, y: screen.frame.maxY - barHeight, width: 80, height: barHeight)
+        // No notch: a compact black tab hanging from the middle of the menu bar.
+        let notch = screen.notchRect ?? NSRect(x: screen.frame.midX, y: screen.frame.maxY - barHeight, width: 0, height: barHeight)
+        if hudDisplay != screen.displayID {
+            hudPanel?.orderOut(nil)
+            hudPanel = nil
+        }
         let panel = hudPanel ?? makeHUD(screen: screen, notch: notch)
         hudPanel = panel
+        hudDisplay = screen.displayID
         model.kind = kind
         model.level = level
         model.muted = muted

@@ -228,6 +228,10 @@ private struct GeneralSettings: View {
                     }
                     Text("6% is the macOS default. Hold ⌥⇧ while pressing the keys for 1% steps.")
                         .font(.caption).foregroundStyle(.secondary)
+                    Toggle(isOn: $settings.brightnessFollowsPointer) {
+                        Text("Brightness keys follow the pointer")
+                        Text("With the pointer on an external monitor, the keys change that screen. Monitors with DDC/CI switched on (in the monitor's own menu) change their real backlight; others are dimmed by EasyMAC.")
+                    }
                 }
             } header: {
                 Text("Notch")

@@ -172,6 +172,7 @@ final class Settings {
     var volumeStepPercent: Int { didSet { store(volumeStepPercent, "volumeStepPercent") } }
     var brightnessStepPercent: Int { didSet { store(brightnessStepPercent, "brightnessStepPercent") } }
     var minBrightnessPercent: Int { didSet { store(minBrightnessPercent, "minBrightnessPercent") } }
+    var brightnessFollowsPointer: Bool { didSet { store(brightnessFollowsPointer, "brightnessFollowsPointer") } }
     var notchAirDrop: Bool { didSet { store(notchAirDrop, "notchAirDrop") } }
     var notchTray: Bool { didSet { store(notchTray, "notchTray") } }
     var notchAwakeIndicator: Bool { didSet { store(notchAwakeIndicator, "notchAwakeIndicator") } }
@@ -265,6 +266,7 @@ final class Settings {
         volumeStepPercent = int("volumeStepPercent", 6)
         brightnessStepPercent = int("brightnessStepPercent", 6)
         minBrightnessPercent = int("minBrightnessPercent", 10)
+        brightnessFollowsPointer = bool("brightnessFollowsPointer", true)
         awakeMode = choice("awakeMode", AwakeMode.display)
         awakeLastDuration = double("awakeLastDuration", 0)
         showTray = bool("showTray", true)
