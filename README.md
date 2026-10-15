@@ -46,4 +46,4 @@ NOTARY_PROFILE=… ./scripts/build-release.sh   # Developer ID + notarized DMG i
 | Tile visible windows | ⌃⌥L |
 | Snap wheel | hold fn, move mouse, release |
 
-All shortcuts can be changed in Settings → Hotkeys. See `NOTES.md` for design decisions and limitations.
+All shortcuts can be changed in Settings → Hotkeys.
