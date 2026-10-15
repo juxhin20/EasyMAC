@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://appalbania.com/easymac/EasyMAC.dmg"><img src="https://img.shields.io/badge/Download-EasyMAC%20for%20macOS-d92b2b?style=for-the-badge&logo=apple&logoColor=white" alt="Download EasyMAC for macOS"></a>
+  <a href="https://appalbania.com/easymac/download/"><img src="https://img.shields.io/badge/Download-EasyMAC%20for%20macOS-d92b2b?style=for-the-badge&logo=apple&logoColor=white" alt="Download EasyMAC for macOS"></a>
   &nbsp;
   <a href="https://appalbania.com/easymac/"><img src="https://img.shields.io/badge/Website-appalbania.com%2Feasymac-111111?style=for-the-badge&logo=safari&logoColor=white" alt="Website"></a>
 </p>
