@@ -11,8 +11,10 @@ xcodebuild -project EasyMAC.xcodeproj -scheme EasyMAC -configuration Release \
 APP=build/DerivedData/Build/Products/Release/EasyMAC.app
 codesign --verify --deep --strict "$APP"
 osascript -e 'tell application id "com.appalbania.easymac" to quit' >/dev/null 2>&1 || true
+# Give it time to save (clipboard history with images can take a few seconds); force only if stuck.
+for _ in $(seq 1 100); do pgrep -x EasyMAC >/dev/null || break; sleep 0.1; done
 pkill -x EasyMAC 2>/dev/null || true
-sleep 0.5
+sleep 0.3
 rm -rf /Applications/EasyMAC.app
 ditto "$APP" /Applications/EasyMAC.app
 open /Applications/EasyMAC.app

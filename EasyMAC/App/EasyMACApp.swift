@@ -79,6 +79,10 @@ struct MenuBarMenu: View {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Quitting must always run applicationWillTerminate (clipboard handoff, workspaces); macOS may
+        // otherwise kill a windowless menu-bar app silently.
+        ProcessInfo.processInfo.disableSuddenTermination()
+        ProcessInfo.processInfo.disableAutomaticTermination("EasyMAC runs in the menu bar")
         AppState.shared.start(launchedAtLogin: Self.wasLaunchedAtLogin())
     }
 

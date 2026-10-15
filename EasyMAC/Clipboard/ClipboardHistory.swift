@@ -213,9 +213,23 @@ final class ClipboardHistory {
     // MARK: - Handoff across a restart (updates) in "until restart" mode
 
     private static var handoffMarker: URL { directory.appendingPathComponent("handoff") }
+    private static var appVersion: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? ""
+    }
+
+    /// The marker holds the build that wrote it. It's valid for 10 minutes after quitting, or at any
+    /// time when a different build reads it — an update installed while EasyMAC was closed (Sparkle
+    /// "install on quit") must not lose the history however late EasyMAC is opened again.
+    private static var handoffIsValid: Bool {
+        let fm = FileManager.default
+        guard let date = (try? fm.attributesOfItem(atPath: handoffMarker.path))?[.modificationDate] as? Date else { return false }
+        if Date().timeIntervalSince(date) < 600 { return true }
+        let writer = (try? String(contentsOf: handoffMarker, encoding: .utf8)) ?? ""
+        return !writer.isEmpty && writer != appVersion
+    }
 
     /// Runs at every launch, even with clipboard history off: in memory-only mode nothing may
-    /// survive on disk except a fresh (< 3 min) update handoff, and nothing at all when disabled.
+    /// survive on disk except an update handoff, and nothing at all when disabled.
     static func cleanUpStaleData(enabled: Bool, retentionDays: Int) {
         let fm = FileManager.default
         guard fm.fileExists(atPath: directory.path) else { return }
@@ -224,36 +238,27 @@ final class ClipboardHistory {
             return
         }
         guard retentionDays == 0 else { return }
-        let date = (try? fm.attributesOfItem(atPath: handoffMarker.path))?[.modificationDate] as? Date
-        if date.map({ Date().timeIntervalSince($0) >= 180 }) ?? true {
-            try? fm.removeItem(at: directory)
-        }
+        if !handoffIsValid { try? fm.removeItem(at: directory) }
     }
 
     /// Called when EasyMAC quits. In memory-only mode the history is written once so an update /
-    /// quick relaunch can pick it up; it is read back within 3 minutes and deleted right away.
+    /// quick relaunch can pick it up; it is read back on the next launch and deleted right away.
     func saveForRelaunch() {
         saveTask?.cancel()
         guard settings.clipboardEnabled, !items.isEmpty else { return }
         Self.save(items)
         if settings.clipboardRetentionDays == 0 {
-            try? Data().write(to: Self.handoffMarker)
+            try? Data(Self.appVersion.utf8).write(to: Self.handoffMarker)
         }
     }
 
     private func load() {
         let fm = FileManager.default
-        let handoff = Self.handoffMarker
         var isHandoff = false
         if settings.clipboardRetentionDays == 0 {
-            guard let attributes = try? fm.attributesOfItem(atPath: handoff.path),
-                  let date = attributes[.modificationDate] as? Date else {
-                try? fm.removeItem(at: Self.directory) // stale memory-only data never lingers
-                return
-            }
-            isHandoff = Date().timeIntervalSince(date) < 180
+            isHandoff = Self.handoffIsValid
             if !isHandoff {
-                try? fm.removeItem(at: Self.directory)
+                try? fm.removeItem(at: Self.directory) // stale memory-only data never lingers
                 return
             }
         }
@@ -273,6 +278,7 @@ final class ClipboardHistory {
             return kind.map { ClipItem(id: entry.id, kind: $0, date: entry.date, sourceBundleID: entry.source) }
         }
         prune()
+        Log.app.notice("Clipboard: restored \(self.items.count) item(s)\(isHandoff ? " after relaunch" : "", privacy: .public)")
     }
 
     /// Puts an item back on the clipboard (without re-adding it as a new entry).
