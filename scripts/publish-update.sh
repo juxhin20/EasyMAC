@@ -23,10 +23,13 @@ ls dist/EasyMAC-*.dmg >/dev/null 2>&1 || { echo "error: no DMG in dist/ — run 
 
 # Keep previously published DMGs so generate_appcast can build delta updates and history.
 mkdir -p dist
-rsync -a --ignore-existing "$REMOTE_HOST:$REMOTE_DIR/" dist/ 2>/dev/null || true
+rsync -a --ignore-existing --exclude='EasyMAC.dmg' "$REMOTE_HOST:$REMOTE_DIR/" dist/ 2>/dev/null || true
 
 "$TOOLS/generate_appcast" --download-url-prefix "$URL_PREFIX" --link https://appalbania.com -o dist/appcast.xml dist/
 
 ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR"
 rsync -av --include='*.dmg' --include='*.delta' --include='*.html' --include='appcast.xml' --exclude='*' dist/ "$REMOTE_HOST:$REMOTE_DIR/"
+# Stable "latest" link (README / GitHub button): EasyMAC.dmg is always the newest version.
+VERSION=$(grep -E '^\s*MARKETING_VERSION:' project.yml | head -1 | sed -E 's/.*"(.*)".*/\1/')
+ssh "$REMOTE_HOST" "cp -f $REMOTE_DIR/EasyMAC-$VERSION.dmg $REMOTE_DIR/EasyMAC.dmg"
 echo "✓ Published. Feed: ${URL_PREFIX}appcast.xml"
