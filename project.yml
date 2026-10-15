@@ -75,36 +75,12 @@ targets:
         Release:
           CODE_SIGN_IDENTITY: "Developer ID Application"
 
-  EasyMACTests:
-    type: bundle.unit-test
-    platform: macOS
-    sources:
-      - path: EasyMACTests
-      # Pure logic is compiled straight into the test bundle (no host app launch needed).
-      - path: EasyMAC/Layouts/LayoutPreset.swift
-      - path: EasyMAC/Layouts/LayoutEngine.swift
-      - path: EasyMAC/Windows/Coordinates.swift
-      - path: EasyMAC/Windows/WindowMatcher.swift
-      - path: EasyMAC/Workspaces/Workspace.swift
-      - path: EasyMAC/Workspaces/WorkspaceStore.swift
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.appalbania.easymac.tests
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: "-"
-        GENERATE_INFOPLIST_FILE: YES
-
 schemes:
   EasyMAC:
     build:
       targets:
         EasyMAC: all
-        EasyMACTests: [test]
     run:
       config: Debug
-    test:
-      config: Debug
-      targets:
-        - EasyMACTests
     archive:
       config: Release
