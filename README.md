@@ -47,3 +47,7 @@ NOTARY_PROFILE=… ./scripts/build-release.sh   # Developer ID + notarized DMG i
 | Snap wheel | hold fn, move mouse, release |
 
 All shortcuts can be changed in Settings → Hotkeys.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Made in Tirana by [AppAlbania](https://appalbania.com).
