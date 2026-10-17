@@ -51,6 +51,14 @@ final class SidebarController {
                 self.updateHandle()
             }
         })
+        // The strip must follow you to every desktop; repair it if macOS pinned it to one.
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.isRevealed { self.panel.rejoinAllSpacesIfNeeded() }
+                self.handle?.rejoinAllSpacesIfNeeded()
+            }
+        })
         observers.append(center.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.menuOpen = true }
         })

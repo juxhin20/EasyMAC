@@ -24,6 +24,16 @@ class FloatingPanel: NSPanel {
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// macOS sometimes pins an all-desktops panel to a single desktop (after a display is unplugged
+    /// or the Mac wakes), so it vanishes when you switch desktops. Re-applying the behavior unpins it.
+    func rejoinAllSpacesIfNeeded() {
+        guard isVisible, !isOnActiveSpace else { return }
+        let behavior = collectionBehavior
+        collectionBehavior = []
+        collectionBehavior = behavior
+        orderFrontRegardless()
+    }
 }
 
 /// Hosting view that reacts to the first click (panel is never key) and reports the mouse position
