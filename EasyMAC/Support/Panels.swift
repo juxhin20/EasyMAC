@@ -25,14 +25,20 @@ class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    /// macOS sometimes pins an all-desktops panel to a single desktop (after a display is unplugged
-    /// or the Mac wakes), so it vanishes when you switch desktops. Re-applying the behavior unpins it.
+    /// macOS sometimes pins an all-desktops panel to a single desktop (a hidden panel keeps the
+    /// desktop it was last on; also after a display is unplugged or the Mac wakes), so it opens on
+    /// Desktop 1 or vanishes when you switch. Re-applying the behavior unpins it.
     func rejoinAllSpacesIfNeeded() {
-        guard isVisible, !isOnActiveSpace else { return }
+        guard isVisible, !isOnActiveSpace, collectionBehavior.contains(.canJoinAllSpaces) else { return }
         let behavior = collectionBehavior
         collectionBehavior = []
         collectionBehavior = behavior
-        orderFrontRegardless()
+        super.orderFrontRegardless()
+    }
+
+    override func orderFrontRegardless() {
+        super.orderFrontRegardless()
+        rejoinAllSpacesIfNeeded()
     }
 }
 

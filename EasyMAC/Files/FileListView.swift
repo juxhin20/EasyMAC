@@ -83,7 +83,7 @@ struct FileListView: View {
             }
             if case .folder(let path) = source {
                 headerButton("arrow.up.forward.app", help: "Open in Finder") {
-                    NSWorkspace.shared.open(URL(fileURLWithPath: path))
+                    FileShelf.openFolder(model.trail.last ?? URL(fileURLWithPath: path))
                 }
             }
             headerButton(isFloating ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
@@ -292,7 +292,7 @@ private struct FileRowInteraction: NSViewRepresentable {
                 let count = files.count
                 menu.addItem(ClosureMenuItem(count > 1 ? "Open \(count) Files" : "Open") { files.filter(\.exists).forEach(FileShelf.open) })
                 menu.addItem(ClosureMenuItem("Quick Look") { [weak self] in self?.actions?.preview() })
-                menu.addItem(ClosureMenuItem("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting(files.map(\.url)) })
+                menu.addItem(ClosureMenuItem("Show in Finder") { files.first.map(FileShelf.reveal) })
                 menu.addItem(ClosureMenuItem(count > 1 ? "Copy \(count) Files" : "Copy") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.writeObjects(files.map { $0.url as NSURL })

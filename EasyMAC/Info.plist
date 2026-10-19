@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>EasyMAC uses Accessibility to focus, move and resize your windows.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>EasyMAC asks Finder to open folders on the desktop you're on.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>EasyMAC lists your Desktop files so you can drag them into other apps.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

@@ -52,7 +52,7 @@ struct ShelfRow: View {
         .contextMenu {
             Button(isOpen ? "Close Floating Window" : "Open as Floating Window") { state.shelf.toggleFloat(source) }
             if case .folder(let path) = source {
-                Button("Open in Finder") { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
+                Button("Open in Finder") { FileShelf.openFolder(URL(fileURLWithPath: path)) }
             }
             if source == .tray && !state.files.tray.isEmpty {
                 Button("Empty Tray") { state.files.clearTray() }

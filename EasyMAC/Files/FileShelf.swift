@@ -189,7 +189,36 @@ final class FileShelf {
     }
 
     static func reveal(_ file: ShelfFile) {
-        NSWorkspace.shared.activateFileViewerSelecting([file.url])
+        showInFinder(file.url.deletingLastPathComponent(), selecting: file.url)
+    }
+
+    /// Opens a folder in a new Finder window on the desktop you're on. A plain open hands it to
+    /// Finder, which jumps to whichever desktop already has its windows (usually Desktop 1).
+    static func openFolder(_ url: URL) {
+        showInFinder(url, selecting: nil)
+    }
+
+    private static func showInFinder(_ folder: URL, selecting item: URL?) {
+        func quoted(_ url: URL) -> String {
+            "POSIX file \"" + url.path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+        }
+        var script = "tell application \"Finder\"\nset w to make new Finder window to (\(quoted(folder)))\n"
+        if let item { script += "select (\(quoted(item)) as alias)\n" }
+        script += "activate\nend tell"
+        // osascript off the main thread: Finder can take a moment, and the first run asks for permission.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            task.arguments = ["-e", script]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let ok = (try? task.run()) != nil && { task.waitUntilExit(); return task.terminationStatus == 0 }()
+            guard !ok else { return }
+            // Finder control not allowed: fall back to the normal open.
+            DispatchQueue.main.async {
+                if let item { NSWorkspace.shared.activateFileViewerSelecting([item]) } else { NSWorkspace.shared.open(folder) }
+            }
+        }
     }
 
     static func copy(_ file: ShelfFile) {
