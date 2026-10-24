@@ -50,5 +50,19 @@ enum MenuBarItems {
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("NSStatusItem") && key.contains(" Item-") {
             defaults.removeObject(forKey: key)
         }
+        moveNextToClockOnce()
+    }
+
+    /// On a notch Mac, icons that don't fit beside the notch are hidden from the left — and new
+    /// icons start at the far left, so ours vanished first whenever an app with a long menu was in
+    /// front. Done once: start them right next to the clock (⌘-dragging them elsewhere still sticks).
+    private static func moveNextToClockOnce() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "menuBarIconsNextToClock") else { return }
+        defaults.set(true, forKey: "menuBarIconsNextToClock")
+        // Preferred position = distance from the right edge of the screen.
+        for (offset, name) in ["clipboard", "files", "awake"].enumerated() {
+            defaults.set(200 + offset * 2, forKey: "NSStatusItem Preferred Position easymac." + name)
+        }
     }
 }
