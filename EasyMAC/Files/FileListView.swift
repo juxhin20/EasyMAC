@@ -43,6 +43,13 @@ struct FileListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contextMenu {
+            // Right-click on empty space in the list (rows have their own menu).
+            Button(model.currentFolder == nil ? "Paste into Tray" : "Paste") { model.paste() }
+            if model.currentFolder != nil {
+                Button("Move Here") { model.paste(move: true) }
+            }
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(dropTargeted ? accent : Color.white.opacity(0.12), lineWidth: dropTargeted ? 2 : 0.5)
@@ -297,6 +304,10 @@ private struct FileRowInteraction: NSViewRepresentable {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.writeObjects(files.map { $0.url as NSURL })
                 })
+                if FileShelf.canPaste {
+                    let title = model.currentFolder == nil ? "Paste into Tray" : "Paste"
+                    menu.addItem(ClosureMenuItem(title) { model.paste() })
+                }
                 menu.addItem(.separator())
                 if model.source == .tray {
                     menu.addItem(ClosureMenuItem(count > 1 ? "Remove \(count) from Tray" : "Remove from Tray") {

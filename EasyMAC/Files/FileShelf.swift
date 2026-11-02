@@ -227,6 +227,55 @@ final class FileShelf {
         pasteboard.writeObjects([file.url as NSURL])
     }
 
+    /// File URLs currently on the clipboard (from Finder, EasyMAC "Copy", Mail…).
+    static func clipboardFiles() -> [URL] {
+        let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
+        return (urls ?? []).filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    static var canPaste: Bool { !clipboardFiles().isEmpty }
+
+    /// Finder-style paste: copies (or moves) the clipboard files into `folder`. Never overwrites —
+    /// a name that already exists gets " copy" (same folder) or " 2", " 3"… like Finder's "Keep Both".
+    /// Runs off the main thread so big files don't freeze the app.
+    static func paste(into folder: URL, move: Bool = false) {
+        let sources = clipboardFiles()
+        guard !sources.isEmpty else { NSSound.beep(); return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let fm = FileManager.default
+            var failed = 0
+            for source in sources {
+                let samePlace = source.deletingLastPathComponent().standardizedFileURL.path == folder.standardizedFileURL.path
+                if move && samePlace { continue } // moving into its own folder: nothing to do
+                let target = freeName(for: source.lastPathComponent, in: folder, duplicate: samePlace)
+                do {
+                    if move { try fm.moveItem(at: source, to: target) } else { try fm.copyItem(at: source, to: target) }
+                } catch {
+                    failed += 1
+                    Log.app.error("Paste of \(source.lastPathComponent, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+            if failed > 0 { DispatchQueue.main.async { NSSound.beep() } }
+        }
+    }
+
+    nonisolated static func freeName(for name: String, in folder: URL, duplicate: Bool) -> URL {
+        let fm = FileManager.default
+        var candidate = folder.appendingPathComponent(name)
+        guard fm.fileExists(atPath: candidate.path) else { return candidate }
+        let ext = (name as NSString).pathExtension
+        let base = (name as NSString).deletingPathExtension
+        func named(_ stem: String) -> URL { folder.appendingPathComponent(ext.isEmpty ? stem : stem + "." + ext) }
+        let stem = duplicate ? base + " copy" : base
+        candidate = named(stem)
+        var n = 2
+        while fm.fileExists(atPath: candidate.path) {
+            candidate = named("\(stem) \(n)")
+            n += 1
+        }
+        return candidate
+    }
+
     private static var icons: [String: NSImage] = [:]
 
     static func icon(_ file: ShelfFile) -> NSImage {

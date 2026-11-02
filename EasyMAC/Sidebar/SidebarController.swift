@@ -56,7 +56,7 @@ final class SidebarController {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if self.isRevealed { self.panel.rejoinAllSpacesIfNeeded() }
-                self.handle?.rejoinAllSpacesIfNeeded()
+                self.handles.values.forEach { $0.rejoinAllSpacesIfNeeded() }
             }
         })
         observers.append(center.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
@@ -163,30 +163,51 @@ final class SidebarController {
 
     // MARK: - Collapse to a small arrow
 
-    private var handle: FloatingPanel?
+    /// One arrow tab per display (keyed by display ID).
+    private var handles: [String: FloatingPanel] = [:]
 
     /// Arrow button: tuck the strip away, leaving a small arrow tab at the screen edge.
     func setCollapsed(_ collapsed: Bool) {
         settings.sidebarCollapsed = collapsed // settingsChanged() re-applies visibility
     }
 
+    /// Screens that get an arrow tab: every display when the strip follows the mouse,
+    /// otherwise only the strip's own display.
+    private var handleScreens: [NSScreen] {
+        if settings.sidebarDisplay == .mouse { return NSScreen.screens }
+        return (currentScreen ?? resolveScreen()).map { [$0] } ?? []
+    }
+
     private func updateHandle() {
         let show = settings.sidebarEnabled && settings.sidebarCollapsed && !peeking
-        guard show, let screen = currentScreen ?? resolveScreen() else {
-            handle?.orderOut(nil)
-            return
+        let screens = show ? handleScreens : []
+        let wanted = Set(screens.map(\.stableID))
+        for (id, panel) in handles where !wanted.contains(id) {
+            panel.orderOut(nil)
+            handles[id] = nil
         }
-        let panel = handle ?? {
-            let p = FloatingPanel(level: .floating)
-            p.hasShadow = true
-            return p
-        }()
-        handle = panel
+        for screen in screens {
+            let panel = handles[screen.stableID] ?? {
+                let p = FloatingPanel(level: .floating)
+                p.hasShadow = true
+                return p
+            }()
+            handles[screen.stableID] = panel
+            layoutHandle(panel, on: screen)
+        }
+    }
+
+    private func layoutHandle(_ panel: FloatingPanel, on screen: NSScreen) {
         let left = settings.sidebarEdge == .left
         let size = NSSize(width: 18, height: 54)
         let visible = screen.visibleFrame
         panel.contentView = NSHostingView(rootView: AnyView(
-            Button { [weak self] in self?.setCollapsed(false) } label: {
+            Button { [weak self] in
+                guard let self else { return }
+                // Open the strip on the display whose tab was clicked.
+                self.currentScreen = screen
+                self.setCollapsed(false)
+            } label: {
                 Image(systemName: left ? "chevron.right" : "chevron.left")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)

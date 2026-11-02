@@ -125,6 +125,12 @@ final class FileShelfController {
         case 36 where !model.selection.isEmpty, 76 where !model.selection.isEmpty: // Return
             model.selectedFiles.forEach(model.open)
             return true
+        case 9 where mods.contains(.command) && !editing && !fromQuickLook: // ⌘V paste here, ⌘⌥V move here
+            model.paste(move: mods.contains(.option))
+            return true
+        case 8 where mods.contains(.command) && !editing: // ⌘C copy the selected files
+            model.copySelection()
+            return true
         case 0 where mods.contains(.command) && !editing: // ⌘A
             model.selectAll()
             return true

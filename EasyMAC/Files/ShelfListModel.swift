@@ -53,6 +53,30 @@ final class ShelfListModel {
         }
     }
 
+    /// The folder this list shows (nil for the tray at its top level).
+    var currentFolder: URL? {
+        if let last = trail.last { return last }
+        if case .folder(let path) = source { return URL(fileURLWithPath: path) }
+        return nil
+    }
+
+    /// ⌘V: copy the clipboard files here (⌘⌥V moves them). In the tray, pasting adds them to the tray.
+    func paste(move: Bool = false) {
+        if let folder = currentFolder {
+            FileShelf.paste(into: folder, move: move)
+        } else {
+            let urls = FileShelf.clipboardFiles()
+            if urls.isEmpty { NSSound.beep() } else { shelf.addToTray(urls) }
+        }
+    }
+
+    func copySelection() {
+        let urls = selectedURLs
+        guard !urls.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects(urls.map { $0 as NSURL })
+    }
+
     func goBack() {
         guard !trail.isEmpty else { return }
         navigate(to: Array(trail.dropLast()))
