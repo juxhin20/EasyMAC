@@ -1,5 +1,6 @@
 import AppKit
 import IOKit.pwr_mgt
+import IOKit.ps
 import Observation
 
 enum AwakeMode: String, CaseIterable, Identifiable {
@@ -111,7 +112,10 @@ final class AwakeController: NSObject, NSMenuDelegate {
 
     func stop() {
         stopAssertions()
-        if lidSleepDisabled { lidSleepDisabled = !Self.setLidSleepDisabled(false) }
+        if lidSleepDisabled {
+            lidSleepDisabled = !Self.setLidSleepDisabled(false)
+            if !lidSleepDisabled { Self.sleepNowIfLidClosed() }
+        }
         endTimer?.invalidate()
         endTimer = nil
         isActive = false
@@ -200,6 +204,33 @@ final class AwakeController: NSObject, NSMenuDelegate {
         NSAppleScript(source: script)?.executeAndReturnError(&error)
         if let error { Log.app.notice("pmset disablesleep failed: \(String(describing: error), privacy: .public)") }
         return error == nil
+    }
+
+    /// macOS only sleeps at the moment the lid closes. When "Lid closed" ends while the lid is already
+    /// shut, re-enabling sleep is not enough — the Mac would stay awake (and drain the battery) for as
+    /// long as any app blocks idle sleep. So put it to sleep ourselves, unless it is being used as a
+    /// desktop (external display + power adapter), where macOS itself keeps a closed Mac awake.
+    private static func sleepNowIfLidClosed() {
+        let root = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+        guard root != 0 else { return }
+        defer { IOObjectRelease(root) }
+        let closed = IORegistryEntryCreateCFProperty(root, "AppleClamshellState" as CFString, kCFAllocatorDefault, 0)?
+            .takeRetainedValue() as? Bool ?? false
+        guard closed else { return }
+
+        var count: UInt32 = 0
+        var displays = [CGDirectDisplayID](repeating: 0, count: 16)
+        CGGetOnlineDisplayList(16, &displays, &count)
+        let hasExternal = displays.prefix(Int(count)).contains { CGDisplayIsBuiltin($0) == 0 }
+        let onAC = (IOPSGetProvidingPowerSourceType(IOPSCopyPowerSourcesInfo().takeRetainedValue())
+            .takeUnretainedValue() as String) == kIOPMACPowerKey
+        if hasExternal && onAC { return }
+
+        Log.app.notice("Keep Awake ended with the lid closed — sleeping now")
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        task.arguments = ["sleepnow"]
+        try? task.run()
     }
 
     /// If EasyMAC died while "Lid closed" was on, sleep would stay disabled — offer to fix it.
