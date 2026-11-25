@@ -28,17 +28,72 @@ class FloatingPanel: NSPanel {
     /// macOS sometimes pins an all-desktops panel to a single desktop (a hidden panel keeps the
     /// desktop it was last on; also after a display is unplugged or the Mac wakes), so it opens on
     /// Desktop 1 or vanishes when you switch. Re-applying the behavior unpins it.
+    ///
+    /// `isOnActiveSpace` alone isn't enough: right after a trackpad swipe it can still report the
+    /// old desktop, so the window server's own list of the panel's desktops is checked as well.
     func rejoinAllSpacesIfNeeded() {
-        guard isVisible, !isOnActiveSpace, collectionBehavior.contains(.canJoinAllSpaces) else { return }
-        let behavior = collectionBehavior
-        collectionBehavior = []
-        collectionBehavior = behavior
+        guard isVisible, collectionBehavior.contains(.canJoinAllSpaces), isPinnedToOneSpace else { return }
+        Log.app.info("panel \(self.windowNumber) pinned to one desktop (onActive=\(self.isOnActiveSpace)), rejoining all")
+        resetSpaceBehavior()
         super.orderFrontRegardless()
     }
 
+    /// Checks again once the desktop-switch animation (a slow trackpad swipe) has settled.
+    func rejoinAllSpacesSoon() {
+        rejoinAllSpacesIfNeeded()
+        for delay in [0.35, 1.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.rejoinAllSpacesIfNeeded() }
+        }
+    }
+
+    private var isPinnedToOneSpace: Bool {
+        if !isOnActiveSpace { return true }
+        guard let spaces = WindowSpaces.spaces(of: CGWindowID(windowNumber)) else { return false }
+        return spaces.count <= 1 && WindowSpaces.desktopCount > 1
+    }
+
+    private func resetSpaceBehavior() {
+        let behavior = collectionBehavior
+        collectionBehavior = []
+        collectionBehavior = behavior
+    }
+
     override func orderFrontRegardless() {
+        // A hidden panel remembers the desktop it was last shown on; unpin it before showing.
+        if !isVisible, collectionBehavior.contains(.canJoinAllSpaces) { resetSpaceBehavior() }
         super.orderFrontRegardless()
         rejoinAllSpacesIfNeeded()
+    }
+}
+
+/// Which desktops a window is on, straight from the window server (private SkyLight calls,
+/// resolved with `dlsym`; nil when unavailable).
+enum WindowSpaces {
+    private typealias ConnectionFn = @convention(c) () -> Int32
+    private typealias SpacesForWindowsFn = @convention(c) (Int32, Int32, CFArray) -> Unmanaged<CFArray>?
+    private typealias DisplaySpacesFn = @convention(c) (Int32) -> Unmanaged<CFArray>?
+
+    nonisolated(unsafe) private static let skylight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)
+    private static let connection: ConnectionFn? = symbol("SLSMainConnectionID") ?? symbol("CGSMainConnectionID")
+    private static let spacesForWindows: SpacesForWindowsFn? = symbol("SLSCopySpacesForWindows") ?? symbol("CGSCopySpacesForWindows")
+    private static let displaySpaces: DisplaySpacesFn? = symbol("SLSCopyManagedDisplaySpaces") ?? symbol("CGSCopyManagedDisplaySpaces")
+
+    private static func symbol<T>(_ name: String) -> T? {
+        guard let skylight, let pointer = dlsym(skylight, name) else { return nil }
+        return unsafeBitCast(pointer, to: T.self)
+    }
+
+    static func spaces(of window: CGWindowID) -> [UInt64]? {
+        guard let cid = connection?(), let copy = spacesForWindows,
+              let raw = copy(cid, 7, [NSNumber(value: window)] as CFArray)?.takeRetainedValue() as? [NSNumber] else { return nil }
+        return raw.map(\.uint64Value)
+    }
+
+    /// Desktops across all displays (fullscreen apps included).
+    static var desktopCount: Int {
+        guard let cid = connection?(), let copy = displaySpaces,
+              let raw = copy(cid)?.takeRetainedValue() as? [[String: Any]] else { return 0 }
+        return raw.reduce(0) { $0 + (($1["Spaces"] as? [Any])?.count ?? 0) }
     }
 }
 

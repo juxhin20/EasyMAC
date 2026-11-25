@@ -55,8 +55,8 @@ final class SidebarController {
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if self.isRevealed { self.panel.rejoinAllSpacesIfNeeded() }
-                self.handles.values.forEach { $0.rejoinAllSpacesIfNeeded() }
+                if self.isRevealed { self.panel.rejoinAllSpacesSoon() }
+                self.handles.values.forEach { $0.rejoinAllSpacesSoon() }
             }
         })
         observers.append(center.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
