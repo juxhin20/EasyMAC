@@ -139,6 +139,7 @@ final class NotchDropController {
     private unowned let state: AppState
     private let model = NotchDropModel()
     private var clickPanel: NotchPanel?
+    private var spaceObserver: NSObjectProtocol?
     private var monitors: [Any] = []
     private var dragChangeCount = 0
     private var dragActive = false
@@ -171,6 +172,12 @@ final class NotchDropController {
             MainActor.assumeIsolated { self?.dragEnded() }
         }) { monitors.append(m) }
         installClickTarget()
+        // The click area over the notch must exist on every desktop, or clicks there do nothing.
+        if spaceObserver == nil {
+            spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.clickPanel?.rejoinAllSpacesSoon() }
+            }
+        }
     }
 
     // MARK: - Drag detection

@@ -95,6 +95,14 @@ final class FileShelfController {
 
     init(state: AppState) {
         self.state = state
+        // Pop-out and floating lists must follow you to every desktop; repair them if macOS pinned one.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.isPopoverOpen { self.popover?.rejoinAllSpacesSoon() }
+                self.floating.values.forEach { $0.rejoinAllSpacesSoon() }
+            }
+        }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             let handled = MainActor.assumeIsolated { self?.handleKey(event) == true }
             return handled ? nil : event
@@ -217,12 +225,22 @@ final class FileShelfController {
     }
 
     private func present(_ source: ShelfSource, frame: NSRect, slide: CGFloat) {
-        if popoverSource == source, isPopoverOpen {
-            closePopover()
+        if popoverSource == source, isPopoverOpen, let panel = popover {
+            if panel.isShownOnCurrentDesktop {
+                closePopover()
+            } else {
+                // Open but stuck on another desktop: bring it here instead of "closing" an invisible list.
+                Log.app.info("tray pop-out open on another desktop, moving it here")
+                panel.setFrame(frame, display: true)
+                panel.alphaValue = 1
+                panel.rejoinAllSpacesSoon()
+                panel.orderFrontRegardless()
+            }
             return
         }
-        if floating[source.id] != nil {
-            floating[source.id]?.orderFrontRegardless()
+        if let existing = floating[source.id] {
+            existing.orderFrontRegardless()
+            existing.rejoinAllSpacesSoon()
             return
         }
         state.sidebar.hidePreview()

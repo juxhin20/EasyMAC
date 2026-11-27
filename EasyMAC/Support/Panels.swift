@@ -46,6 +46,9 @@ class FloatingPanel: NSPanel {
         }
     }
 
+    /// Visible on the desktop you're looking at right now (not just open on some other desktop).
+    var isShownOnCurrentDesktop: Bool { isVisible && !isPinnedToOneSpace }
+
     private var isPinnedToOneSpace: Bool {
         if !isOnActiveSpace { return true }
         guard let spaces = WindowSpaces.spaces(of: CGWindowID(windowNumber)) else { return false }

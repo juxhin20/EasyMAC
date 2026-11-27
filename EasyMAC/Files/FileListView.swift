@@ -186,6 +186,7 @@ private struct FileRow: View {
             Text(FileListView.shortAge(file.date))
                 .font(.system(size: 9.5, design: .rounded))
                 .foregroundStyle(selected ? Color.white.opacity(0.8) : Color.secondary.opacity(0.7))
+                .opacity(showsRemove ? 0 : 1)
         }
         .padding(.horizontal, 6)
         .frame(height: 24)
@@ -193,7 +194,42 @@ private struct FileRow: View {
             .fill(selected ? accent : (hovered ? Color.primary.opacity(0.09) : .clear)))
         .opacity(file.exists ? 1 : 0.4)
         .overlay(FileRowInteraction(file: file, model: model, actions: actions))
+        // Above the click layer so the bin gets its own clicks.
+        .overlay(alignment: .trailing) {
+            if showsRemove {
+                RemoveFromTrayButton(selected: selected) {
+                    AppState.shared.files.removeFromTray(file.url.path)
+                }
+                .padding(.trailing, 3)
+            }
+        }
         .help(file.url.path)
+    }
+
+    /// Bin on hover/selection, Tray only: removes the item from the Tray (the file itself stays).
+    private var showsRemove: Bool {
+        model.source == .tray && model.currentFolder == nil && (model.hoveredID == file.id || model.isSelected(file))
+    }
+}
+
+private struct RemoveFromTrayButton: View {
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "trash")
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(selected ? Color.white : (hovered ? Color.primary : Color.secondary))
+                .frame(width: 20, height: 18)
+                .background(RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(hovered ? (selected ? Color.white.opacity(0.22) : Color.primary.opacity(0.1)) : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .help("Remove from Tray")
     }
 }
 
